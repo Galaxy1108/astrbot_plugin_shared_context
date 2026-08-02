@@ -60,9 +60,17 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 ```json
 {
   "工作群": ["qq-bot:GroupMessage:20002", "wechat-bot:GroupMessage:789"],
-  "好友": ["qq-bot:FriendMessage:10001", "telegram-bot:FriendMessage:222"]
+  "好友": ["qq-bot:FriendMessage:10001", "telegram-bot:FriendMessage:222"],
+  "全家桶": ["*"],
+  "整台机器人": ["qq-bot:*"]
 }
 ```
+
+组条目支持三种写法：
+
+- `qq-bot:FriendMessage:10001`：精确指定一个会话（`/sid` 可查）
+- `*`：当前机器人的**所有会话**（配合其他条目可实现"整机全共享 + 个别跨机器人"）
+- `qq-bot:*`：指定机器人的所有会话（跨机器人场景）
 
 规则：
 

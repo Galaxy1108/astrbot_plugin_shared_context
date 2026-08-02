@@ -88,11 +88,34 @@ class SharedContextPlugin(Star):
     def _cross_bot(self) -> bool:
         return bool(self._cfg("cross_bot_share", False))
 
-    def _allowed(self, umo: str) -> set[str] | None:
-        """Return the umos allowed to share with the current session.
+    @staticmethod
+    def _entry_matches(entry: str, umo: str, current_platform: str) -> bool:
+        """Check whether a group entry covers the given session.
 
-        Returns None when all sessions of the same bot are allowed to share,
-        or the (possibly empty) set of umos allowed by custom groups. An empty
+        Supported entry forms: exact umo (`qq-bot:FriendMessage:10001`),
+        current-bot wildcard (`*`), and platform wildcard (`qq-bot:*`).
+        """
+        if entry == "*":
+            return True
+        if entry.endswith(":*"):
+            return entry[:-2] == current_platform
+        return entry == umo
+
+    def _entry_allowed(self, entry: str, current_platform: str, cross: bool) -> bool:
+        """Check whether a group entry is usable by the current session."""
+        if entry == "*":
+            return True
+        if entry.endswith(":*"):
+            return cross or entry[:-2] == current_platform
+        return cross or entry.split(":", 1)[0] == current_platform
+
+    def _allowed(self, umo: str) -> set[tuple[str, str]] | None:
+        """Return the share rules allowed for the current session.
+
+        Rules are ("umo", umo_str) exact sessions or ("platform", platform_id)
+        wildcards (a bare "*" is normalized to ("platform", current_platform)).
+        Returns None when all sessions of the same bot are allowed to share, or
+        the (possibly empty) set of rules allowed by custom groups. An empty
         set means the session belongs to no group.
         """
         if not self._cfg("enable_custom_groups", False):
@@ -102,13 +125,19 @@ class SharedContextPlugin(Star):
             return None
         current_platform = umo.split(":", 1)[0]
         cross = self._cross_bot()
-        allowed: set[str] = set()
+        allowed: set[tuple[str, str]] = set()
         for members in groups:
-            if umo not in members:
+            if not any(self._entry_matches(m, umo, current_platform) for m in members):
                 continue
             for member in members:
-                if cross or member.split(":", 1)[0] == current_platform:
-                    allowed.add(member)
+                if not self._entry_allowed(member, current_platform, cross):
+                    continue
+                if member == "*":
+                    allowed.add(("platform", current_platform))
+                elif member.endswith(":*"):
+                    allowed.add(("platform", member[:-2]))
+                else:
+                    allowed.add(("umo", member))
         return allowed
 
     async def _persist(self) -> None:
@@ -199,7 +228,7 @@ class SharedContextPlugin(Star):
                 return
             logger.debug(
                 f"shared_context: session hit | {current_umo} | "
-                f"mode={'share_all' if allowed is None else 'groups(' + str(len(allowed)) + ' umos)'} | "
+                f"mode={'share_all' if allowed is None else 'rules(' + str(len(allowed)) + ')'} | "
                 f"cross_bot={self._cross_bot()}"
             )
 
@@ -219,8 +248,14 @@ class SharedContextPlugin(Star):
                     umo = record.get("umo", "")
                     if (sid, umo) == (self_id, current_umo):
                         continue
-                    if allowed is not None and umo not in allowed:
-                        continue
+                    if allowed is not None:
+                        platform = umo.split(":", 1)[0]
+                        matched = ("umo", umo) in allowed or (
+                            "platform",
+                            platform,
+                        ) in allowed
+                        if not matched:
+                            continue
                     if cutoff_ts is not None and int(record.get("ts", 0)) < cutoff_ts:
                         continue
                     line = record.get("text", "")

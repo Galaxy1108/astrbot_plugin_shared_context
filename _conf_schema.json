@@ -12,7 +12,7 @@
   "share_groups": {
     "description": "多共享组：键为组名，值为该组的 unified_msg_origin 数组。填写后仅组内的会话互相共享；留空 {} = 共享该机器人的全部会话（默认）。",
     "type": "dict",
-    "hint": "添加组时值类型请选 JSON（默认是 string）。会话可属于多个组；组内属于其他机器人的条目需开启 cross_bot_share 才生效。详细用法见 README「自定义共享组」与「跨机器人共享」章节。",
+    "hint": "添加组时值类型请选 JSON（默认是 string）。条目支持三种写法：精确会话 umo、*（当前机器人的所有会话）、qq-bot:*（指定机器人的所有会话）。详细用法见 README「自定义共享组」与「跨机器人共享」章节。",
     "default": {}
   },
   "max_messages": {
