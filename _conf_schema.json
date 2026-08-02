@@ -5,11 +5,12 @@
     "default": false
   },
   "out_of_group_mode": {
-    "description": "未命中任何共享组条目的会话如何处理：isolate = 完全隔离（不记录、不注入）；fallback = 回退到默认的同一机器人全部共享。",
+    "description": "未命中任何共享组条目的会话的回退行为：isolate = 完全独立（不记录、不注入）；bot = 回退到同一机器人全部共享；global = 回退到全局共享（跨所有机器人，不推荐）。",
     "type": "string",
     "options": [
       "isolate",
-      "fallback"
+      "bot",
+      "global"
     ],
     "default": "isolate"
   },

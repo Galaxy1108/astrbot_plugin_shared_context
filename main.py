@@ -17,6 +17,7 @@ import asyncio
 import datetime
 import time
 from collections import defaultdict, deque
+from typing import Literal
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
@@ -45,20 +46,6 @@ class SharedContextPlugin(Star):
         # self_id -> deque of {"umo": str, "text": str, "ts": int}
         self._pools: dict[str, deque[dict]] = defaultdict(deque)
         self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
-        # sessions already warned about being outside every group
-        self._warned_umos: set[str] = set()
-
-    def _warn_isolated(self, umo: str) -> None:
-        """Warn once per session when it is isolated from every group."""
-        if umo in self._warned_umos:
-            return
-        self._warned_umos.add(umo)
-        logger.warning(
-            f"shared_context: session {umo} is not in any share group and is "
-            f"now isolated (not recorded, not injected). Add it to a group, "
-            f"use '*' / 'bot:*' wildcards, or set out_of_group_mode=fallback "
-            f"to restore default same-bot sharing."
-        )
 
     async def initialize(self) -> None:
         """Load persisted pools so the shared context survives reloads."""
@@ -123,15 +110,18 @@ class SharedContextPlugin(Star):
             return cross or entry[:-2] == current_platform
         return cross or entry.split(":", 1)[0] == current_platform
 
-    def _allowed(self, umo: str) -> set[tuple[str, str]] | None:
+    def _allowed(self, umo: str) -> set[tuple[str, str]] | Literal["global"] | None:
         """Return the share rules allowed for the current session.
 
         Rules are ("umo", umo_str) exact sessions or ("platform", platform_id)
         wildcards (a bare "*" is normalized to ("platform", current_platform)).
-        Returns None when all sessions of the same bot are allowed to share
-        (default mode, or fallback for unlisted sessions), or the (possibly
-        empty) set of rules allowed by custom groups. An empty set means the
-        session belongs to no group and is isolated.
+        Returns:
+            - None: all sessions of the same bot are allowed (default mode, or
+              `bot` fallback for unlisted sessions).
+            - "global": fallback for unlisted sessions when
+              `out_of_group_mode=global` (shares across all bots).
+            - An empty set: the session belongs to no group and is isolated.
+            - Otherwise: the rule set allowed by custom groups.
         """
         if not self._cfg("enable_custom_groups", False):
             return None
@@ -153,8 +143,12 @@ class SharedContextPlugin(Star):
                     allowed.add(("platform", member[:-2]))
                 else:
                     allowed.add(("umo", member))
-        if not allowed and self._cfg("out_of_group_mode", "isolate") == "fallback":
-            return None
+        if not allowed:
+            mode = self._cfg("out_of_group_mode", "isolate")
+            if mode == "bot":
+                return None
+            if mode == "global":
+                return "global"
         return allowed
 
     async def _persist(self) -> None:
@@ -165,7 +159,6 @@ class SharedContextPlugin(Star):
         """Append a formatted record to the pool of the event's bot."""
         umo = event.unified_msg_origin
         if self._allowed(umo) == set():
-            self._warn_isolated(umo)
             return
         self_id = event.get_self_id()
         max_msgs = max(1, int(self._cfg("max_messages", 50)))
@@ -238,11 +231,13 @@ class SharedContextPlugin(Star):
             current_umo = event.unified_msg_origin
             allowed = self._allowed(current_umo)
             if allowed == set():
-                self._warn_isolated(current_umo)
                 return
+            global_share = allowed == "global"
+            if global_share:
+                allowed = None
             logger.debug(
                 f"shared_context: session hit | {current_umo} | "
-                f"mode={'share_all' if allowed is None else 'rules(' + str(len(allowed)) + ')'} | "
+                f"mode={'global' if global_share else 'share_all' if allowed is None else 'rules(' + str(len(allowed)) + ')'} | "
                 f"cross_bot={self._cross_bot()}"
             )
 
@@ -255,7 +250,7 @@ class SharedContextPlugin(Star):
             lines: list[str] = []
             budget = max_chars
             for sid, pool in list(self._pools.items()):
-                if not self._cross_bot() and sid != self_id:
+                if not global_share and not self._cross_bot() and sid != self_id:
                     continue
                 before = len(lines)
                 for record in reversed(list(pool)):

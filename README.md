@@ -42,7 +42,7 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 | 配置项 | 默认 | 说明 |
 | --- | --- | --- |
 | `enable_custom_groups` | `false` | 关闭时（默认）同一机器人下的所有会话共享全部上下文 |
-| `out_of_group_mode` | `isolate` | 未命中任何组条目的会话如何处理：`isolate` = 完全隔离；`fallback` = 回退到默认的同一机器人全部共享 |
+| `out_of_group_mode` | `isolate` | 未命中任何组条目的会话的回退行为：`isolate` = 完全独立；`bot` = 回退到同一机器人全部共享；`global` = 回退到全局共享（跨所有机器人，不推荐） |
 | `cross_bot_share` | `false` | 允许跨机器人共享。需同时开启 `enable_custom_groups` 才生效，且仅限 `share_groups` 组内的会话 |
 | `share_groups` | `{}` | 多共享组：键为组名，值为该组的 `unified_msg_origin` 数组 |
 | `max_messages` | `50` | 共享池保留的最大消息条数 |
@@ -76,8 +76,10 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 规则：
 
 - 会话可属于多个组（出现在任一组的数组里即算成员）；注入时取所属所有组的成员并集（排除自身）
-- 不属于任何组的会话（`out_of_group_mode=isolate`，默认）：不记录、不接收共享（闭组），首次隔离时日志会打一条 WARNING 提示
-- 将 `out_of_group_mode` 设为 `fallback`：组外会话回退到默认行为（同机器人全部共享），组内会话仍按组共享
+- 未命中任何组条目的会话按 `out_of_group_mode` 回退：
+  - `isolate`（默认）：完全独立——不记录、不接收共享（闭组）
+  - `bot`：回退到同一机器人的全部共享
+  - `global`（不推荐）：回退到全局共享（跨所有机器人）
 - 留空 `{}` 或关闭开关 = 仍然共享该机器人的所有会话
 
 ### 跨机器人共享（可选）
