@@ -245,12 +245,3 @@ class SharedContextPlugin(Star):
             )
         except Exception as e:
             logger.error(f"shared_context: failed to inject context: {e}")
-
-    @filter.command("shared_umo")
-    async def shared_umo(self, event: AstrMessageEvent):
-        """Show the current session's identifiers, used to fill share groups."""
-        yield event.plain_result(
-            f"umo: {event.unified_msg_origin}\n"
-            f"bot_id: {event.get_self_id()}\n"
-            f"cross-bot 条目示例: {event.get_self_id()}::{event.unified_msg_origin}"
-        )

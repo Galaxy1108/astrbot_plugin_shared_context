@@ -55,7 +55,7 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 
 1. 开启 `enable_custom_groups`
 2. 在 `share_groups` 中添加组：键为组名，值为 `unified_msg_origin` 数组
-3. 向机器人发送 `/shared_umo`，可直接查看当前会话的 `unified_msg_origin`（格式 `平台实例ID:消息类型:会话号`，如 `汐月-QQ:FriendMessage:3768914943` 是 QQ 私聊、`汐月-QQ:GroupMessage:1073048858` 是 QQ 群聊）和 `bot_id`
+3. 向机器人发送 `/sid`（AstrBot 内置指令），可直接查看当前会话的 `unified_msg_origin`（格式 `平台实例ID:消息类型:会话号`，如 `汐月-QQ:FriendMessage:3768914943` 是 QQ 私聊、`汐月-QQ:GroupMessage:1073048858` 是 QQ 群聊）
 
 ```json
 {
@@ -85,7 +85,8 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 ```
 
 - 不带前缀的条目（如 `汐月-QQ:FriendMessage:123`）匹配**任意机器人**上 umo 相同的会话
-- 同平台多个机器人时 umo 可能相同，必须用 `bot_id::umo` 前缀精确区分（bot_id 可用 `/shared_umo` 查看）
+- 普通配置下不同机器人的 `平台实例ID` 不同（`/sid` 的 Bot ID 字段），umo 天然互不冲突，直接写 umo 即可
+- 仅当多个适配器共用同一个平台 ID 时（如都用了默认 `aiocqhttp`），才需要用 `bot_id::umo` 前缀精确区分（bot_id 即机器人账号 ID）
 - 只有两个开关都开启且会话被显式分组时才会跨机器人共享——不开开关行为与旧版完全一致
 
 ## 与 enhance_mode 等群聊插件共存
