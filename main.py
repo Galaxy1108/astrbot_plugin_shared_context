@@ -76,26 +76,30 @@ class SharedContextPlugin(Star):
     def _group_members(self) -> list[list[str]]:
         """Parse share_groups into member lists.
 
-        Each list item is one group line `组名=umo1,umo2` (bare umos without
-        "=" go into an implicit default group). Legacy dict format is also
-        accepted for backward compatibility.
+        Supported formats:
+        - text (current): one group per line, `组名=umo1,umo2` (bare umos go
+          into an implicit default group)
+        - list (legacy): each item a line in the same format
+        - dict (legacy): {group_name: [umo, ...]}
         """
-        raw = self._cfg("share_groups", [])
+        raw = self._cfg("share_groups", "")
         if isinstance(raw, dict):
-            # legacy format: {group_name: [umo, ...]}
+            # legacy dict format: {group_name: [umo, ...]}
             return [
                 [str(m).strip() for m in members if isinstance(m, str) and m.strip()]
                 for members in raw.values()
                 if isinstance(members, list)
             ]
-        if not isinstance(raw, list):
+        lines: list[str] = []
+        if isinstance(raw, str):
+            lines = [line.strip() for line in raw.splitlines() if line.strip()]
+        elif isinstance(raw, list):
+            lines = [str(i).strip() for i in raw if isinstance(i, str) and i.strip()]
+        if not lines:
             return []
         groups: list[list[str]] = []
         default_group: list[str] = []
-        for item in raw:
-            if not isinstance(item, str) or not item.strip():
-                continue
-            line = item.strip()
+        for line in lines:
             if "=" in line:
                 members = [
                     m.strip() for m in line.split("=", 1)[1].split(",") if m.strip()

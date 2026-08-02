@@ -56,7 +56,7 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 ### 自定义共享组
 
 1. 开启 `enable_custom_groups`
-2. 在 `share_groups` 列表中添加/批量导入：**每行一个组，格式 `组名=umo1,umo2`**（不带等号的单条 umo 会归入默认组）
+2. 在 `share_groups` 文本框里填写：**每行一个组，格式 `组名=umo1,umo2`**（不带等号的单条 umo 会归入默认组）
 3. 向机器人发送 `/sid`（AstrBot 内置指令），可直接查看当前会话的 `unified_msg_origin`（格式 `平台实例ID:消息类型:会话号`，如 `qq-bot:FriendMessage:10001` 是 QQ 私聊、`qq-bot:GroupMessage:20002` 是 QQ 群聊）
 
 ```
