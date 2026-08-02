@@ -1,37 +1,46 @@
 {
-  "enable_custom_groups": {
-    "description": "启用自定义共享组。关闭时（默认）同一机器人下的所有会话共享全部上下文。",
-    "type": "bool",
-    "default": false
-  },
-  "out_of_group_mode": {
-    "description": "未命中任何共享组条目的会话的处理方式（组内只见组内，组外只见组外，互不可见）：isolate = 完全独立（不记录、不注入）；bot = 与本机器人其他组外会话共享；global = 与所有机器人的组外会话共享（不推荐）。",
-    "type": "string",
-    "options": [
-      "isolate",
-      "bot",
-      "global"
-    ],
-    "default": "isolate",
-    "condition": {
-      "enable_custom_groups": true
-    }
-  },
-  "cross_bot_share": {
-    "description": "允许跨机器人共享（需同时开启上方开关，且仅限 share_groups 中显式分组的会话）。关闭时不同机器人之间永不共享。",
-    "type": "bool",
-    "default": false,
-    "condition": {
-      "enable_custom_groups": true
-    }
-  },
-  "share_groups": {
-    "description": "多共享组：键为组名，值为该组的 unified_msg_origin 数组。填写后仅组内的会话互相共享；留空 {} = 共享该机器人的全部会话（默认）。",
-    "type": "dict",
-    "hint": "添加组时值类型请选 JSON（默认是 string）。条目支持三种写法：精确会话 umo、*（当前机器人的所有会话）、qq-bot:*（指定机器人的所有会话）。详细用法见 README「自定义共享组」与「跨机器人共享」章节。",
-    "default": {},
-    "condition": {
-      "enable_custom_groups": true
+  "custom_groups": {
+    "description": "自定义共享组：按组控制哪些会话之间共享上下文",
+    "type": "object",
+    "items": {
+      "enable_custom_groups": {
+        "description": "启用自定义共享组",
+        "hint": "关闭时（默认）同一机器人下的所有会话共享全部上下文。",
+        "type": "bool",
+        "default": false
+      },
+      "out_of_group_mode": {
+        "description": "组外会话的处理方式",
+        "hint": "未命中任何共享组条目的会话的处理方式（组内只见组内，组外只见组外，互不可见）：isolate = 完全独立（不记录、不注入）；bot = 与本机器人其他组外会话共享；global = 与所有机器人的组外会话共享（不推荐）。",
+        "type": "string",
+        "options": [
+          "isolate",
+          "bot",
+          "global"
+        ],
+        "default": "isolate",
+        "condition": {
+          "enable_custom_groups": true
+        }
+      },
+      "cross_bot_share": {
+        "description": "允许跨机器人共享",
+        "hint": "仅对 share_groups 中显式分组的会话生效；关闭时不同机器人之间永不共享。",
+        "type": "bool",
+        "default": false,
+        "condition": {
+          "enable_custom_groups": true
+        }
+      },
+      "share_groups": {
+        "description": "多共享组（键为组名，值为 umo 数组）",
+        "hint": "添加组时值类型请选 JSON（默认是 string）。条目支持三种写法：精确会话 umo、*（当前机器人的所有会话）、qq-bot:*（指定机器人的所有会话）。详细用法见 README「自定义共享组」与「跨机器人共享」章节。",
+        "type": "dict",
+        "default": {},
+        "condition": {
+          "enable_custom_groups": true
+        }
+      }
     }
   },
   "max_messages": {

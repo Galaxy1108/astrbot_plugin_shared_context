@@ -68,6 +68,9 @@ class SharedContextPlugin(Star):
 
     def _cfg(self, key: str, default):
         value = self.config.get(key)
+        group = self.config.get("custom_groups")
+        if isinstance(group, dict) and key in group:
+            value = group[key]
         return default if value is None else value
 
     def _group_members(self) -> list[list[str]]:

@@ -41,9 +41,10 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 
 | 配置项 | 默认 | 说明 |
 | --- | --- | --- |
-| `enable_custom_groups` | `false` | 关闭时（默认）同一机器人下的所有会话共享全部上下文 |
-| `out_of_group_mode` | `isolate` | 未命中任何组条目的会话的处理方式（**组内只见组内，组外只见组外，互不可见**）：`isolate` = 完全独立；`bot` = 与本机器人其他组外会话共享；`global` = 与所有机器人的组外会话共享（不推荐） |
-| `cross_bot_share` | `false` | 允许跨机器人共享。需同时开启 `enable_custom_groups` 才生效，且仅限 `share_groups` 组内的会话 |
+| **自定义共享组**（分组） | | |
+| `enable_custom_groups` | `false` | 启用自定义共享组。关闭时（默认）同一机器人下的所有会话共享全部上下文 |
+| `out_of_group_mode` | `isolate` | 组外会话的处理方式（组内只见组内，组外只见组外，互不可见）：`isolate` = 完全独立；`bot` = 与本机器人其他组外会话共享；`global` = 与所有机器人的组外会话共享（不推荐） |
+| `cross_bot_share` | `false` | 允许跨机器人共享，仅对 `share_groups` 中显式分组的会话生效 |
 | `share_groups` | `{}` | 多共享组：键为组名，值为该组的 `unified_msg_origin` 数组 |
 | `max_messages` | `50` | 共享池保留的最大消息条数 |
 | `max_chars` | `3000` | 每轮 LLM 请求注入的字符数上限 |
