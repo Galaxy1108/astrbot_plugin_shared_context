@@ -1,5 +1,14 @@
 # 更新日志
 
+## 0.2.0
+
+- 新增**跨机器人共享**（`cross_bot_share`，默认关闭，开启后仅显式分组的会话互通）
+- 新增 `out_of_group_mode`：组外会话的处理方式（isolate 完全独立 / bot 同机器人组外互见 / global 全机器组外互见，组内只见组内、组外只见组外，互不可见）
+- 组条目支持通配符：`*`（本机器人全部会话）、`bot:*`（指定机器人全部会话）
+- `share_groups` 改为 JSON 编辑器（键为组名、值为 umo 数组），兼容旧格式
+- 完善 debug 日志：记录/会话命中/各池贡献条数可观测
+- 规避 AstrBot `check_config_integrity` 清空 dict 类型配置内容的缺陷（改用 text 存储）
+
 ## 0.1.1
 
 - 新增插件 Logo（`logo.png`）
