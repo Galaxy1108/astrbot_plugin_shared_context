@@ -55,8 +55,9 @@ class SharedContextPlugin(Star):
         self._warned_umos.add(umo)
         logger.warning(
             f"shared_context: session {umo} is not in any share group and is "
-            f"now isolated (not recorded, not injected). Add it to a group or "
-            f"use '*' / 'bot:*' wildcards to include it."
+            f"now isolated (not recorded, not injected). Add it to a group, "
+            f"use '*' / 'bot:*' wildcards, or set out_of_group_mode=fallback "
+            f"to restore default same-bot sharing."
         )
 
     async def initialize(self) -> None:
@@ -127,9 +128,10 @@ class SharedContextPlugin(Star):
 
         Rules are ("umo", umo_str) exact sessions or ("platform", platform_id)
         wildcards (a bare "*" is normalized to ("platform", current_platform)).
-        Returns None when all sessions of the same bot are allowed to share, or
-        the (possibly empty) set of rules allowed by custom groups. An empty
-        set means the session belongs to no group.
+        Returns None when all sessions of the same bot are allowed to share
+        (default mode, or fallback for unlisted sessions), or the (possibly
+        empty) set of rules allowed by custom groups. An empty set means the
+        session belongs to no group and is isolated.
         """
         if not self._cfg("enable_custom_groups", False):
             return None
@@ -151,6 +153,8 @@ class SharedContextPlugin(Star):
                     allowed.add(("platform", member[:-2]))
                 else:
                     allowed.add(("umo", member))
+        if not allowed and self._cfg("out_of_group_mode", "isolate") == "fallback":
+            return None
         return allowed
 
     async def _persist(self) -> None:
