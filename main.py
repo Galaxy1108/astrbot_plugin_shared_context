@@ -15,6 +15,7 @@ Implements:
 
 import asyncio
 import datetime
+import json
 import time
 from collections import defaultdict, deque
 from typing import Literal
@@ -77,12 +78,40 @@ class SharedContextPlugin(Star):
         """Parse share_groups into member lists.
 
         Supported formats:
-        - text (current): one group per line, `组名=umo1,umo2` (bare umos go
-          into an implicit default group)
-        - list (legacy): each item a line in the same format
+        - JSON (current): `{"组名": ["umo1", "umo2"]}` (also accepts a plain
+          array of umos, and lines of the legacy text format as a fallback)
+        - text (legacy): one group per line, `组名=umo1,umo2`
         - dict (legacy): {group_name: [umo, ...]}
+        - list (legacy): each item a line in the legacy text format
         """
         raw = self._cfg("share_groups", "")
+        if isinstance(raw, str) and raw.strip():
+            try:
+                data = json.loads(raw)
+                if isinstance(data, dict):
+                    return [
+                        [
+                            str(m).strip()
+                            for m in members
+                            if isinstance(m, str) and m.strip()
+                        ]
+                        for members in data.values()
+                        if isinstance(members, list)
+                    ]
+                if isinstance(data, list):
+                    return [
+                        [
+                            str(m).strip()
+                            for m in members
+                            if isinstance(m, str) and m.strip()
+                        ]
+                        for members in data
+                        if isinstance(members, list)
+                    ]
+            except (ValueError, TypeError):
+                # 以 { 或 [ 开头的内容视为 JSON，解析失败直接视为无效配置
+                if raw.lstrip().startswith(("{", "[")):
+                    return []
         if isinstance(raw, dict):
             # legacy dict format: {group_name: [umo, ...]}
             return [

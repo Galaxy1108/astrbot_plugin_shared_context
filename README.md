@@ -56,14 +56,16 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 ### 自定义共享组
 
 1. 开启 `enable_custom_groups`
-2. 在 `share_groups` 文本框里填写：**每行一个组，格式 `组名=umo1,umo2`**（不带等号的单条 umo 会归入默认组）
+2. 在 `share_groups` 的 JSON 编辑器里填写：**键为组名，值为该组的 `unified_msg_origin` 数组**（编辑器带实时 JSON 校验）
 3. 向机器人发送 `/sid`（AstrBot 内置指令），可直接查看当前会话的 `unified_msg_origin`（格式 `平台实例ID:消息类型:会话号`，如 `qq-bot:FriendMessage:10001` 是 QQ 私聊、`qq-bot:GroupMessage:20002` 是 QQ 群聊）
 
-```
-工作群=qq-bot:GroupMessage:20002,wechat-bot:GroupMessage:789
-好友=qq-bot:FriendMessage:10001,telegram-bot:FriendMessage:222
-全家桶=*
-整台机器人=qq-bot:*
+```json
+{
+  "工作群": ["qq-bot:GroupMessage:20002", "wechat-bot:GroupMessage:789"],
+  "好友": ["qq-bot:FriendMessage:10001", "telegram-bot:FriendMessage:222"],
+  "全家桶": ["*"],
+  "整台机器人": ["qq-bot:*"]
+}
 ```
 
 组条目支持三种写法：
@@ -83,8 +85,8 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 
 这是**单向桥**。想让微信侧也能看到本机，把本机机器人也显式声明进组：
 
-```
-对称桥=*,qq-bot:*,wechat-bot:FriendMessage:10001
+```json
+{ "对称桥": ["*", "qq-bot:*", "wechat-bot:FriendMessage:10001"] }
 ```
 
 此时微信侧的 `qq-bot:*` 条目对它同样生效，双向对等。
