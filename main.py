@@ -65,9 +65,9 @@ class SharedContextPlugin(Star):
     def _parse_entry(entry: str) -> tuple[str | None, str]:
         """Parse a group member entry into (self_id | None, umo).
 
-        Entries are either plain umos (`aiocqhttp:private:123`) that match any
-        bot's session with that umo, or prefixed with a bot id
-        (`2973035822::aiocqhttp:private:123`) for precise cross-bot binding.
+        Entries are either plain umos (`汐月-QQ:FriendMessage:123`) that match
+        any bot's session with that umo, or prefixed with a bot id
+        (`2973035822::汐月-QQ:FriendMessage:123`) for precise cross-bot binding.
         """
         if "::" in entry:
             sid, _, umo = entry.partition("::")

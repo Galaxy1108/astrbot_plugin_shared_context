@@ -55,12 +55,12 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 
 1. 开启 `enable_custom_groups`
 2. 在 `share_groups` 中添加组：键为组名，值为 `unified_msg_origin` 数组
-3. 向机器人发送 `/shared_umo`，可查看当前会话的 `unified_msg_origin`（格式 `platform:type:session_id`，如 `aiocqhttp:private:123456`、`telegram:group:789`）和 `bot_id`
+3. 向机器人发送 `/shared_umo`，可直接查看当前会话的 `unified_msg_origin`（格式 `平台实例ID:消息类型:会话号`，如 `汐月-QQ:FriendMessage:3768914943` 是 QQ 私聊、`汐月-QQ:GroupMessage:1073048858` 是 QQ 群聊）和 `bot_id`
 
 ```json
 {
-  "工作群": ["aiocqhttp:group:123456", "telegram:group:789"],
-  "好友": ["aiocqhttp:private:111", "telegram:private:222"]
+  "工作群": ["汐月-QQ:GroupMessage:1073048858", "telegram-bot:GroupMessage:789"],
+  "好友": ["汐月-QQ:FriendMessage:3768914943", "wechat-bot:FriendMessage:222"]
 }
 ```
 
@@ -79,12 +79,12 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 
 ```json
 {
-  "我的跨平台": ["aiocqhttp:private:123", "telegram:private:456"],
-  "双QQ桥接": ["2973035822::aiocqhttp:private:123", "55335533::aiocqhttp:private:123"]
+  "我的跨平台": ["汐月-QQ:FriendMessage:3768914943", "微信bot:FriendMessage:3768914943"],
+  "双QQ桥接": ["2973035822::汐月-QQ:FriendMessage:123", "55335533::汐月-QQ:FriendMessage:123"]
 }
 ```
 
-- 不带前缀的条目（如 `aiocqhttp:private:123`）匹配**任意机器人**上 umo 相同的会话
+- 不带前缀的条目（如 `汐月-QQ:FriendMessage:123`）匹配**任意机器人**上 umo 相同的会话
 - 同平台多个机器人时 umo 可能相同，必须用 `bot_id::umo` 前缀精确区分（bot_id 可用 `/shared_umo` 查看）
 - 只有两个开关都开启且会话被显式分组时才会跨机器人共享——不开开关行为与旧版完全一致
 
