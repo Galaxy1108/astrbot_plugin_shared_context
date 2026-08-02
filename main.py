@@ -74,20 +74,39 @@ class SharedContextPlugin(Star):
         return default if value is None else value
 
     def _group_members(self) -> list[list[str]]:
-        """Return all share groups as plain umo member lists."""
-        groups = self._cfg("share_groups", {})
-        parsed_groups: list[list[str]] = []
-        if not isinstance(groups, dict):
-            return parsed_groups
-        for members in groups.values():
-            if not isinstance(members, list):
-                continue
-            cleaned = [
-                str(m).strip() for m in members if isinstance(m, str) and m.strip()
+        """Parse share_groups into member lists.
+
+        Each list item is one group line `组名=umo1,umo2` (bare umos without
+        "=" go into an implicit default group). Legacy dict format is also
+        accepted for backward compatibility.
+        """
+        raw = self._cfg("share_groups", [])
+        if isinstance(raw, dict):
+            # legacy format: {group_name: [umo, ...]}
+            return [
+                [str(m).strip() for m in members if isinstance(m, str) and m.strip()]
+                for members in raw.values()
+                if isinstance(members, list)
             ]
-            if cleaned:
-                parsed_groups.append(cleaned)
-        return parsed_groups
+        if not isinstance(raw, list):
+            return []
+        groups: list[list[str]] = []
+        default_group: list[str] = []
+        for item in raw:
+            if not isinstance(item, str) or not item.strip():
+                continue
+            line = item.strip()
+            if "=" in line:
+                members = [
+                    m.strip() for m in line.split("=", 1)[1].split(",") if m.strip()
+                ]
+                if members:
+                    groups.append(members)
+            else:
+                default_group.append(line)
+        if default_group:
+            groups.append(default_group)
+        return groups
 
     def _cross_bot(self) -> bool:
         return bool(self._cfg("cross_bot_share", False))

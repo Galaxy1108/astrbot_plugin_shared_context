@@ -33,10 +33,13 @@
         }
       },
       "share_groups": {
-        "description": "多共享组（键为组名，值为 umo 数组）",
-        "hint": "添加组时值类型请选 JSON。条目三种写法：精确会话 umo、*（对任何会话都展开为本机器人内的全部对话）、qq-bot:*（指定机器人的全部会话）。跨机器人双向互通需显式声明对端机器人。详细用法见 README「自定义共享组」与「跨机器人共享」章节。",
-        "type": "dict",
-        "default": {},
+        "description": "多共享组（每行一个组：组名=umo1,umo2；无等号的单条 umo 归入默认组）",
+        "hint": "列表添加/批量导入每行一组，如 \"好友=qq-bot:FriendMessage:10001,telegram-bot:FriendMessage:222\"。条目支持三种写法：精确会话 umo、*（对任何会话都展开为本机器人内的全部对话）、qq-bot:*（指定机器人的全部会话）。跨机器人双向互通需显式声明对端机器人。详细用法见 README「自定义共享组」与「跨机器人共享」章节。",
+        "type": "list",
+        "items": {
+          "type": "string"
+        },
+        "default": [],
         "condition": {
           "enable_custom_groups": true
         }
