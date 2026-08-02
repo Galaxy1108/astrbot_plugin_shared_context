@@ -110,18 +110,34 @@ class SharedContextPlugin(Star):
             return cross or entry[:-2] == current_platform
         return cross or entry.split(":", 1)[0] == current_platform
 
-    def _allowed(self, umo: str) -> set[tuple[str, str]] | Literal["global"] | None:
+    def _in_any_group(self, umo: str) -> bool:
+        """Check whether the session identified by umo is a group member."""
+        platform = umo.split(":", 1)[0]
+        return any(
+            self._entry_matches(m, umo, platform)
+            for members in self._group_members()
+            for m in members
+        )
+
+    def _allowed(
+        self, umo: str
+    ) -> set[tuple[str, str]] | Literal["bot-out", "global"] | None:
         """Return the share rules allowed for the current session.
 
         Rules are ("umo", umo_str) exact sessions or ("platform", platform_id)
         wildcards (a bare "*" is normalized to ("platform", current_platform)).
+        Sharing is symmetric: sessions inside a group only see each other, and
+        sessions outside every group only see other outside-group sessions
+        (never group members, and never seen by them).
+
         Returns:
-            - None: all sessions of the same bot are allowed (default mode, or
-              `bot` fallback for unlisted sessions).
-            - "global": fallback for unlisted sessions when
-              `out_of_group_mode=global` (shares across all bots).
-            - An empty set: the session belongs to no group and is isolated.
-            - Otherwise: the rule set allowed by custom groups.
+            - None: all sessions of the same bot are allowed (default mode).
+            - "bot-out": the session is outside every group and `bot` fallback
+              is set; it may see unlisted same-bot sessions only.
+            - "global": the session is outside every group and `global`
+              fallback is set; it may see unlisted sessions of every bot.
+            - An empty set: the session is outside every group and isolated.
+            - Otherwise: the rule set allowed by the session's groups.
         """
         if not self._cfg("enable_custom_groups", False):
             return None
@@ -143,13 +159,14 @@ class SharedContextPlugin(Star):
                     allowed.add(("platform", member[:-2]))
                 else:
                     allowed.add(("umo", member))
-        if not allowed:
-            mode = self._cfg("out_of_group_mode", "isolate")
-            if mode == "bot":
-                return None
-            if mode == "global":
-                return "global"
-        return allowed
+        if allowed:
+            return allowed
+        mode = self._cfg("out_of_group_mode", "isolate")
+        if mode == "bot":
+            return "bot-out"
+        if mode == "global":
+            return "global"
+        return set()
 
     async def _persist(self) -> None:
         data = {self_id: list(records) for self_id, records in self._pools.items()}
@@ -232,12 +249,13 @@ class SharedContextPlugin(Star):
             allowed = self._allowed(current_umo)
             if allowed == set():
                 return
+            bot_out = allowed == "bot-out"
             global_share = allowed == "global"
-            if global_share:
+            if bot_out or global_share:
                 allowed = None
             logger.debug(
                 f"shared_context: session hit | {current_umo} | "
-                f"mode={'global' if global_share else 'share_all' if allowed is None else 'rules(' + str(len(allowed)) + ')'} | "
+                f"mode={'global' if global_share else 'bot-out' if bot_out else 'share_all' if allowed is None else 'rules(' + str(len(allowed)) + ')'} | "
                 f"cross_bot={self._cross_bot()}"
             )
 
@@ -256,6 +274,8 @@ class SharedContextPlugin(Star):
                 for record in reversed(list(pool)):
                     umo = record.get("umo", "")
                     if (sid, umo) == (self_id, current_umo):
+                        continue
+                    if (bot_out or global_share) and self._in_any_group(umo):
                         continue
                     if allowed is not None:
                         platform = umo.split(":", 1)[0]

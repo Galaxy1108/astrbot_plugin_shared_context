@@ -5,7 +5,7 @@
     "default": false
   },
   "out_of_group_mode": {
-    "description": "未命中任何共享组条目的会话的回退行为：isolate = 完全独立（不记录、不注入）；bot = 回退到同一机器人全部共享；global = 回退到全局共享（跨所有机器人，不推荐）。",
+    "description": "未命中任何共享组条目的会话的处理方式（组内只见组内，组外只见组外，互不可见）：isolate = 完全独立（不记录、不注入）；bot = 与本机器人其他组外会话共享；global = 与所有机器人的组外会话共享（不推荐）。",
     "type": "string",
     "options": [
       "isolate",
