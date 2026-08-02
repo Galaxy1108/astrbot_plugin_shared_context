@@ -5,4 +5,9 @@ desc: 记录同一机器人下所有会话的消息流水，并在每次 LLM 请
 version: 0.1.0
 author: Galaxy1108
 repo: https://github.com/Galaxy1108/astrbot_plugin_shared_context
+tags:
+  - 上下文
+  - 共享
+  - 记忆
+  - LLM
 astrbot_version: ">=4.9.2"
