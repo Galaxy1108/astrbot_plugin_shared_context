@@ -10,10 +10,13 @@
     "default": false
   },
   "share_groups": {
-    "description": "自定义共享组（仅当 enable_custom_groups 开启时生效）：键为组名，值为该组的 unified_msg_origin 数组（值类型请选 json）。留空 {} 表示仍然共享全部。",
-    "type": "dict",
-    "hint": "示例：键 \"工作群\"，值 [\"汐月-QQ:GroupMessage:1073048858\", \"telegram-bot:GroupMessage:789\"]。会话可属于多个组；不属于任何组的会话不记录、不接收共享。条目格式为 平台实例ID:消息类型:会话号（私聊 FriendMessage / 群聊 GroupMessage），用内置指令 /sid 可查看当前会话的真实值。未开启 cross_bot_share 时，组内属于其他机器人的条目会被忽略。",
-    "default": {}
+    "description": "共享白名单：参与共享的会话 unified_msg_origin 列表。填写后仅列表内的会话之间互相共享；留空 = 共享该机器人的全部会话（默认）。",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "hint": "每个条目是一个会话的 unified_msg_origin，格式 平台实例ID:消息类型:会话号（私聊 FriendMessage / 群聊 GroupMessage），如 \"汐月-QQ:FriendMessage:3768914943\"。用内置指令 /sid 可查看当前会话的真实值。未开启 cross_bot_share 时，列表里属于其他机器人的条目会被忽略。",
+    "default": []
   },
   "max_messages": {
     "description": "共享池保留的最大消息条数",

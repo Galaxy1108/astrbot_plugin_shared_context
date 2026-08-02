@@ -42,8 +42,8 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 | 配置项 | 默认 | 说明 |
 | --- | --- | --- |
 | `enable_custom_groups` | `false` | 关闭时（默认）同一机器人下的所有会话共享全部上下文 |
-| `cross_bot_share` | `false` | 允许跨机器人共享。需同时开启 `enable_custom_groups` 才生效，且仅限 `share_groups` 中显式分组的会话 |
-| `share_groups` | `{}` | 多共享组：键为组名，值为该组的 `unified_msg_origin` 数组（值类型选 json）。仅开关开启时生效 |
+| `cross_bot_share` | `false` | 允许跨机器人共享。需同时开启 `enable_custom_groups` 才生效，且仅限 `share_groups` 白名单中的会话 |
+| `share_groups` | `[]` | 共享白名单：参与共享的会话 `unified_msg_origin` 列表（列表 GUI 直接增删编辑） |
 | `max_messages` | `50` | 共享池保留的最大消息条数 |
 | `max_chars` | `3000` | 每轮 LLM 请求注入的字符数上限 |
 | `max_message_chars` | `200` | 单条消息记录时的截断长度 |
@@ -51,40 +51,36 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 | `include_bot_replies` | `true` | 是否记录并共享机器人回复 |
 | `skip_command` | `true` | 跳过以 `/` 开头的指令消息 |
 
-### 自定义共享组
+### 自定义共享白名单
 
 1. 开启 `enable_custom_groups`
-2. 在 `share_groups` 中添加组：键为组名，值为 `unified_msg_origin` 数组
+2. 在 `share_groups` 列表中添加会话的 `unified_msg_origin`（列表 GUI 支持逐条添加/编辑/删除和批量导入）
 3. 向机器人发送 `/sid`（AstrBot 内置指令），可直接查看当前会话的 `unified_msg_origin`（格式 `平台实例ID:消息类型:会话号`，如 `汐月-QQ:FriendMessage:3768914943` 是 QQ 私聊、`汐月-QQ:GroupMessage:1073048858` 是 QQ 群聊）
 
-```json
-{
-  "工作群": ["汐月-QQ:GroupMessage:1073048858", "telegram-bot:GroupMessage:789"],
-  "好友": ["汐月-QQ:FriendMessage:3768914943", "wechat-bot:FriendMessage:222"]
-}
+```
+汐月-QQ:GroupMessage:1073048858
+汐月-QQ:FriendMessage:3768914943
 ```
 
 规则：
 
-- 会话可属于多个组；所属所有组的成员并集（排除自身）会被注入
-- 不属于任何组的会话：不记录、不接收共享（闭组）
-- 留空 `{}` 或关闭开关 = 仍然共享该机器人的所有会话
+- 白名单内的会话互相共享（排除自身）；不在白名单内的会话：不记录、不接收共享
+- 留空列表或关闭开关 = 仍然共享该机器人的所有会话
 
 ### 跨机器人共享（可选）
 
 默认关闭，不同机器人之间的上下文**物理隔离**。需要时：
 
 1. 开启 `enable_custom_groups` 和 `cross_bot_share`
-2. 把不同机器人的会话放进**同一个组**即可（不同机器人的 `平台实例ID` 不同，umo 天然互不冲突）：
+2. 把不同机器人的会话 umo 都加进**同一个白名单**即可（不同机器人的 `平台实例ID` 不同，umo 天然互不冲突）：
 
-```json
-{
-  "我的跨平台": ["汐月-QQ:FriendMessage:3768914943", "微信bot:FriendMessage:3768914943"]
-}
+```
+汐月-QQ:FriendMessage:3768914943
+微信bot:FriendMessage:3768914943
 ```
 
-- 未开启 `cross_bot_share` 时，组内属于其他机器人的条目会被忽略（按 umo 第一段 `平台实例ID` 过滤）
-- 只有两个开关都开启且会话被显式分组时才会跨机器人共享——不开开关行为与旧版完全一致
+- 未开启 `cross_bot_share` 时，白名单里属于其他机器人的条目会被忽略（按 umo 第一段 `平台实例ID` 过滤）
+- 只有两个开关都开启时才会跨机器人共享——不开开关行为与旧版完全一致
 - 只有两个开关都开启且会话被显式分组时才会跨机器人共享——不开开关行为与旧版完全一致
 
 ## 与 enhance_mode 等群聊插件共存
