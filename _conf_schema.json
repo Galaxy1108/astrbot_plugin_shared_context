@@ -1,0 +1,43 @@
+{
+  "enable_custom_groups": {
+    "description": "启用自定义共享组。关闭时（默认）同一机器人下的所有会话共享全部上下文。",
+    "type": "bool",
+    "default": false
+  },
+  "share_groups": {
+    "description": "自定义共享组（仅当上方开关开启时生效）：键为组名，值为该组的 unified_msg_origin 数组（值类型请选 json）。留空 {} 表示仍然共享全部。",
+    "type": "dict",
+    "hint": "示例：键 \"工作群\"，值 [\"aiocqhttp:group:123\", \"telegram:private:456\"]。会话可属于多个组；不属于任何组的会话不记录、不接收共享。可用指令 /shared_umo 查看当前会话的 unified_msg_origin。",
+    "default": {}
+  },
+  "max_messages": {
+    "description": "共享池保留的最大消息条数",
+    "type": "int",
+    "default": 50
+  },
+  "max_chars": {
+    "description": "每轮 LLM 请求注入的字符数上限",
+    "type": "int",
+    "default": 3000
+  },
+  "max_message_chars": {
+    "description": "单条消息记录时的截断长度",
+    "type": "int",
+    "default": 200
+  },
+  "time_window_minutes": {
+    "description": "只注入最近 N 分钟内的消息，0 表示不限",
+    "type": "int",
+    "default": 0
+  },
+  "include_bot_replies": {
+    "description": "是否记录并共享机器人回复",
+    "type": "bool",
+    "default": true
+  },
+  "skip_command": {
+    "description": "跳过以 / 开头的指令消息",
+    "type": "bool",
+    "default": true
+  }
+}
