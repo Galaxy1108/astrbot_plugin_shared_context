@@ -61,12 +61,21 @@ class SharedContextPlugin(Star):
         value = self.config.get(key)
         return default if value is None else value
 
-    def _share_members(self) -> list[str]:
-        """Return the flat umo whitelist from config."""
-        members = self._cfg("share_groups", [])
-        if not isinstance(members, list):
-            return []
-        return [str(m).strip() for m in members if isinstance(m, str) and m.strip()]
+    def _group_members(self) -> list[list[str]]:
+        """Return all share groups as plain umo member lists."""
+        groups = self._cfg("share_groups", {})
+        parsed_groups: list[list[str]] = []
+        if not isinstance(groups, dict):
+            return parsed_groups
+        for members in groups.values():
+            if not isinstance(members, list):
+                continue
+            cleaned = [
+                str(m).strip() for m in members if isinstance(m, str) and m.strip()
+            ]
+            if cleaned:
+                parsed_groups.append(cleaned)
+        return parsed_groups
 
     def _cross_bot(self) -> bool:
         return bool(self._cfg("cross_bot_share", False))
@@ -75,20 +84,24 @@ class SharedContextPlugin(Star):
         """Return the umos allowed to share with the current session.
 
         Returns None when all sessions of the same bot are allowed to share,
-        or the (possibly empty) set of whitelisted umos. An empty set means
-        the session is not on the whitelist (record nothing / inject nothing).
+        or the (possibly empty) set of umos allowed by custom groups. An empty
+        set means the session belongs to no group.
         """
         if not self._cfg("enable_custom_groups", False):
             return None
-        members = self._share_members()
-        if not members:
+        groups = self._group_members()
+        if not groups:
             return None
-        if umo not in members:
-            return set()
-        if self._cross_bot():
-            return set(members)
         current_platform = umo.split(":", 1)[0]
-        return {m for m in members if m.split(":", 1)[0] == current_platform}
+        cross = self._cross_bot()
+        allowed: set[str] = set()
+        for members in groups:
+            if umo not in members:
+                continue
+            for member in members:
+                if cross or member.split(":", 1)[0] == current_platform:
+                    allowed.add(member)
+        return allowed
 
     async def _persist(self) -> None:
         data = {self_id: list(records) for self_id, records in self._pools.items()}

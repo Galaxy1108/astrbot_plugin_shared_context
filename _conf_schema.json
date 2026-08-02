@@ -10,13 +10,10 @@
     "default": false
   },
   "share_groups": {
-    "description": "共享白名单：参与共享的会话 unified_msg_origin 列表。填写后仅列表内的会话之间互相共享；留空 = 共享该机器人的全部会话（默认）。",
-    "type": "list",
-    "items": {
-      "type": "string"
-    },
-    "hint": "每个条目是一个会话的 unified_msg_origin，格式 平台实例ID:消息类型:会话号（私聊 FriendMessage / 群聊 GroupMessage），如 \"汐月-QQ:FriendMessage:3768914943\"。用内置指令 /sid 可查看当前会话的真实值。未开启 cross_bot_share 时，列表里属于其他机器人的条目会被忽略。",
-    "default": []
+    "description": "多共享组：键为组名，值为该组的 unified_msg_origin 数组。填写后仅组内的会话互相共享；留空 {} = 共享该机器人的全部会话（默认）。",
+    "type": "dict",
+    "hint": "添加方法：点修改 → 新键名填组名 → 值类型选 JSON → 值填 [\"汐月-QQ:FriendMessage:3768914943\", \"汐月-QQ:GroupMessage:1073048858\"]。会话可属于多个组（出现在任一组的列表里即算成员），注入时取所属所有组的成员并集。用内置指令 /sid 可查看当前会话的 umo。未开启 cross_bot_share 时，组内属于其他机器人的条目会被忽略。",
+    "default": {}
   },
   "max_messages": {
     "description": "共享池保留的最大消息条数",
