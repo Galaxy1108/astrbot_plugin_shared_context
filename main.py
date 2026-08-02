@@ -45,6 +45,19 @@ class SharedContextPlugin(Star):
         # self_id -> deque of {"umo": str, "text": str, "ts": int}
         self._pools: dict[str, deque[dict]] = defaultdict(deque)
         self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        # sessions already warned about being outside every group
+        self._warned_umos: set[str] = set()
+
+    def _warn_isolated(self, umo: str) -> None:
+        """Warn once per session when it is isolated from every group."""
+        if umo in self._warned_umos:
+            return
+        self._warned_umos.add(umo)
+        logger.warning(
+            f"shared_context: session {umo} is not in any share group and is "
+            f"now isolated (not recorded, not injected). Add it to a group or "
+            f"use '*' / 'bot:*' wildcards to include it."
+        )
 
     async def initialize(self) -> None:
         """Load persisted pools so the shared context survives reloads."""
@@ -148,7 +161,7 @@ class SharedContextPlugin(Star):
         """Append a formatted record to the pool of the event's bot."""
         umo = event.unified_msg_origin
         if self._allowed(umo) == set():
-            logger.debug(f"shared_context: skipped record (not in any group) | {umo}")
+            self._warn_isolated(umo)
             return
         self_id = event.get_self_id()
         max_msgs = max(1, int(self._cfg("max_messages", 50)))
@@ -221,10 +234,7 @@ class SharedContextPlugin(Star):
             current_umo = event.unified_msg_origin
             allowed = self._allowed(current_umo)
             if allowed == set():
-                logger.debug(
-                    f"shared_context: session not in any group, skip injection | "
-                    f"{current_umo}"
-                )
+                self._warn_isolated(current_umo)
                 return
             logger.debug(
                 f"shared_context: session hit | {current_umo} | "
