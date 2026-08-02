@@ -135,7 +135,7 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 ## 常见问题
 
 **Q: 我的两个机器人会不会串台？**
-不会。消息池按 `self_id` 分桶，跨机器人共享在代码层面被禁止。
+默认不会。消息池按 `self_id` 分桶，不开 `cross_bot_share` 时跨机器人共享在代码层面被禁止；只有同时开启 `enable_custom_groups` 和 `cross_bot_share` 并显式分组后才会互通。
 
 **Q: 群聊消息会被共享吗？**
 会。群消息（含未唤醒机器人的闲聊）与机器人回复都会入池并共享给其他会话。开启"隔离会话"的群内成员之间也互相感知。
