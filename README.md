@@ -75,18 +75,16 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 默认关闭，不同机器人之间的上下文**物理隔离**。需要时：
 
 1. 开启 `enable_custom_groups` 和 `cross_bot_share`
-2. 把不同机器人的会话放进**同一个组**（组条目带 `bot_id::` 前缀可精确指定某个机器人）：
+2. 把不同机器人的会话放进**同一个组**即可（不同机器人的 `平台实例ID` 不同，umo 天然互不冲突）：
 
 ```json
 {
-  "我的跨平台": ["汐月-QQ:FriendMessage:3768914943", "微信bot:FriendMessage:3768914943"],
-  "双QQ桥接": ["2973035822::汐月-QQ:FriendMessage:123", "55335533::汐月-QQ:FriendMessage:123"]
+  "我的跨平台": ["汐月-QQ:FriendMessage:3768914943", "微信bot:FriendMessage:3768914943"]
 }
 ```
 
-- 不带前缀的条目（如 `汐月-QQ:FriendMessage:123`）匹配**任意机器人**上 umo 相同的会话
-- 普通配置下不同机器人的 `平台实例ID` 不同（`/sid` 的 Bot ID 字段），umo 天然互不冲突，直接写 umo 即可
-- 仅当多个适配器共用同一个平台 ID 时（如都用了默认 `aiocqhttp`），才需要用 `bot_id::umo` 前缀精确区分（bot_id 即机器人账号 ID）
+- 未开启 `cross_bot_share` 时，组内属于其他机器人的条目会被忽略（按 umo 第一段 `平台实例ID` 过滤）
+- 只有两个开关都开启且会话被显式分组时才会跨机器人共享——不开开关行为与旧版完全一致
 - 只有两个开关都开启且会话被显式分组时才会跨机器人共享——不开开关行为与旧版完全一致
 
 ## 与 enhance_mode 等群聊插件共存

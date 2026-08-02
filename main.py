@@ -61,63 +61,46 @@ class SharedContextPlugin(Star):
         value = self.config.get(key)
         return default if value is None else value
 
-    @staticmethod
-    def _parse_entry(entry: str) -> tuple[str | None, str]:
-        """Parse a group member entry into (self_id | None, umo).
-
-        Entries are either plain umos (`汐月-QQ:FriendMessage:123`) that match
-        any bot's session with that umo, or prefixed with a bot id
-        (`2973035822::汐月-QQ:FriendMessage:123`) for precise cross-bot binding.
-        """
-        if "::" in entry:
-            sid, _, umo = entry.partition("::")
-            return (sid or None, umo)
-        return (None, entry)
-
-    def _group_members(self) -> list[list[tuple[str | None, str]]]:
-        """Return all share groups as parsed member pairs."""
+    def _group_members(self) -> list[list[str]]:
+        """Return all share groups as plain umo member lists."""
         groups = self._cfg("share_groups", {})
-        parsed_groups: list[list[tuple[str | None, str]]] = []
+        parsed_groups: list[list[str]] = []
         if not isinstance(groups, dict):
             return parsed_groups
         for members in groups.values():
             if not isinstance(members, list):
                 continue
-            parsed = [
-                self._parse_entry(str(m))
-                for m in members
-                if isinstance(m, str) and m.strip()
+            cleaned = [
+                str(m).strip() for m in members if isinstance(m, str) and m.strip()
             ]
-            if parsed:
-                parsed_groups.append(parsed)
+            if cleaned:
+                parsed_groups.append(cleaned)
         return parsed_groups
 
     def _cross_bot(self) -> bool:
         return bool(self._cfg("cross_bot_share", False))
 
-    def _allowed(self, sid: str, umo: str) -> set[tuple[str | None, str]] | None:
-        """Return the member pairs allowed to share with the current session.
+    def _allowed(self, umo: str) -> set[str] | None:
+        """Return the umos allowed to share with the current session.
 
         Returns None when all sessions of the same bot are allowed to share,
-        or the (possibly empty) set of member pairs allowed by custom groups.
-        An empty set means the session belongs to no group.
+        or the (possibly empty) set of umos allowed by custom groups. An empty
+        set means the session belongs to no group.
         """
         if not self._cfg("enable_custom_groups", False):
             return None
         groups = self._group_members()
         if not groups:
             return None
+        current_platform = umo.split(":", 1)[0]
         cross = self._cross_bot()
-        allowed: set[tuple[str | None, str]] = set()
+        allowed: set[str] = set()
         for members in groups:
-            if not any(
-                (e_sid is None or e_sid == sid) and e_umo == umo
-                for e_sid, e_umo in members
-            ):
+            if umo not in members:
                 continue
-            for e_sid, e_umo in members:
-                if cross or e_sid is None or e_sid == sid:
-                    allowed.add((e_sid, e_umo))
+            for member in members:
+                if cross or member.split(":", 1)[0] == current_platform:
+                    allowed.add(member)
         return allowed
 
     async def _persist(self) -> None:
@@ -126,9 +109,9 @@ class SharedContextPlugin(Star):
 
     async def _record(self, event: AstrMessageEvent, text: str) -> None:
         """Append a formatted record to the pool of the event's bot."""
-        self_id = event.get_self_id()
-        if self._allowed(self_id, event.unified_msg_origin) == set():
+        if self._allowed(event.unified_msg_origin) == set():
             return
+        self_id = event.get_self_id()
         max_msgs = max(1, int(self._cfg("max_messages", 50)))
         async with self._locks[self_id]:
             pool = self._pools[self_id]
@@ -202,7 +185,7 @@ class SharedContextPlugin(Star):
         try:
             self_id = event.get_self_id()
             current_umo = event.unified_msg_origin
-            allowed = self._allowed(self_id, current_umo)
+            allowed = self._allowed(current_umo)
             if allowed == set():
                 return
 
@@ -214,19 +197,14 @@ class SharedContextPlugin(Star):
 
             lines: list[str] = []
             budget = max_chars
-            allowed_umos: set[str] | None = None
             for sid, pool in list(self._pools.items()):
                 if not self._cross_bot() and sid != self_id:
                     continue
-                if allowed is not None:
-                    allowed_umos = {
-                        umo for e_sid, umo in allowed if e_sid is None or e_sid == sid
-                    }
                 for record in reversed(list(pool)):
                     umo = record.get("umo", "")
                     if (sid, umo) == (self_id, current_umo):
                         continue
-                    if allowed is not None and umo not in allowed_umos:
+                    if allowed is not None and umo not in allowed:
                         continue
                     if cutoff_ts is not None and int(record.get("ts", 0)) < cutoff_ts:
                         continue
