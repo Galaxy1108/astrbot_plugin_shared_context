@@ -12,7 +12,7 @@
   "share_groups": {
     "description": "多共享组：键为组名，值为该组的 unified_msg_origin 数组。填写后仅组内的会话互相共享；留空 {} = 共享该机器人的全部会话（默认）。",
     "type": "dict",
-    "hint": "添加方法：点修改 → 新键名填组名 → 值类型选 JSON → 值填 [\"qq-bot:FriendMessage:10001\", \"qq-bot:GroupMessage:20002\"]。会话可属于多个组（出现在任一组的列表里即算成员），注入时取所属所有组的成员并集。用内置指令 /sid 可查看当前会话的 umo。未开启 cross_bot_share 时，组内属于其他机器人的条目会被忽略。",
+    "hint": "添加组时值类型请选 JSON（默认是 string）。会话可属于多个组；组内属于其他机器人的条目需开启 cross_bot_share 才生效。详细用法见 README「自定义共享组」与「跨机器人共享」章节。",
     "default": {}
   },
   "max_messages": {
