@@ -56,6 +56,14 @@ class SharedContextPlugin(Star):
                         self._pools[self_id].extend(records)
         except Exception as e:
             logger.error(f"shared_context: failed to load pools: {e}")
+        groups = self._group_members()
+        logger.info(
+            "shared_context: initialized | cross_bot_share=%s | groups=%d | "
+            "pool_sessions=%d",
+            self._cross_bot(),
+            len(groups),
+            len(self._pools),
+        )
 
     def _cfg(self, key: str, default):
         value = self.config.get(key)
@@ -109,21 +117,18 @@ class SharedContextPlugin(Star):
 
     async def _record(self, event: AstrMessageEvent, text: str) -> None:
         """Append a formatted record to the pool of the event's bot."""
-        if self._allowed(event.unified_msg_origin) == set():
+        umo = event.unified_msg_origin
+        if self._allowed(umo) == set():
+            logger.debug(f"shared_context: skipped record (not in any group) | {umo}")
             return
         self_id = event.get_self_id()
         max_msgs = max(1, int(self._cfg("max_messages", 50)))
         async with self._locks[self_id]:
             pool = self._pools[self_id]
-            pool.append(
-                {
-                    "umo": event.unified_msg_origin,
-                    "text": text,
-                    "ts": int(time.time()),
-                }
-            )
+            pool.append({"umo": umo, "text": text, "ts": int(time.time())})
             while len(pool) > max_msgs:
                 pool.popleft()
+        logger.debug(f"shared_context: recorded | {self_id} | {umo} | {text}")
         try:
             await self._persist()
         except Exception as e:
