@@ -192,7 +192,16 @@ class SharedContextPlugin(Star):
             current_umo = event.unified_msg_origin
             allowed = self._allowed(current_umo)
             if allowed == set():
+                logger.debug(
+                    f"shared_context: session not in any group, skip injection | "
+                    f"{current_umo}"
+                )
                 return
+            logger.debug(
+                f"shared_context: session hit | {current_umo} | "
+                f"mode={'share_all' if allowed is None else 'groups(' + str(len(allowed)) + ' umos)'} | "
+                f"cross_bot={self._cross_bot()}"
+            )
 
             max_chars = max(1, int(self._cfg("max_chars", 3000)))
             window_minutes = int(self._cfg("time_window_minutes", 0))
@@ -205,6 +214,7 @@ class SharedContextPlugin(Star):
             for sid, pool in list(self._pools.items()):
                 if not self._cross_bot() and sid != self_id:
                     continue
+                before = len(lines)
                 for record in reversed(list(pool)):
                     umo = record.get("umo", "")
                     if (sid, umo) == (self_id, current_umo):
@@ -218,7 +228,16 @@ class SharedContextPlugin(Star):
                         continue
                     lines.append(line)
                     budget -= len(line)
+                if len(lines) > before:
+                    logger.debug(
+                        f"shared_context: pool hit | bot={sid} | "
+                        f"contributed={len(lines) - before} lines"
+                    )
             if not lines:
+                logger.debug(
+                    f"shared_context: pools empty or no match, skip injection | "
+                    f"{current_umo}"
+                )
                 return
 
             block = CONTEXT_HEADER + "\n".join(reversed(lines)) + CONTEXT_FOOTER
