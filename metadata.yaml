@@ -2,7 +2,7 @@ name: astrbot_plugin_shared_context
 display_name: Shared Context · 共享上下文
 short_desc: 让同一机器人的不同会话共享 LLM 上下文
 desc: 记录同一机器人下所有会话的消息流水，并在每次 LLM 请求时注入其他会话的近期消息作为临时上下文。支持自定义共享组、时间窗与长度上限；不同机器人之间永不共享上下文。
-version: 0.1.0
+version: 0.1.1
 author: Galaxy1108
 repo: https://github.com/Galaxy1108/astrbot_plugin_shared_context
 tags:
