@@ -55,12 +55,12 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 
 1. 开启 `enable_custom_groups`
 2. 编辑 `share_groups`（键值对编辑器）：**新键名填组名 → 值类型选 JSON → 值填 umo 数组**
-3. 向机器人发送 `/sid`（AstrBot 内置指令），可直接查看当前会话的 `unified_msg_origin`（格式 `平台实例ID:消息类型:会话号`，如 `汐月-QQ:FriendMessage:3768914943` 是 QQ 私聊、`汐月-QQ:GroupMessage:1073048858` 是 QQ 群聊）
+3. 向机器人发送 `/sid`（AstrBot 内置指令），可直接查看当前会话的 `unified_msg_origin`（格式 `平台实例ID:消息类型:会话号`，如 `qq-bot:FriendMessage:10001` 是 QQ 私聊、`qq-bot:GroupMessage:20002` 是 QQ 群聊）
 
 ```json
 {
-  "工作群": ["汐月-QQ:GroupMessage:1073048858", "微信bot:GroupMessage:789"],
-  "好友": ["汐月-QQ:FriendMessage:3768914943", "telegram-bot:FriendMessage:222"]
+  "工作群": ["qq-bot:GroupMessage:20002", "wechat-bot:GroupMessage:789"],
+  "好友": ["qq-bot:FriendMessage:10001", "telegram-bot:FriendMessage:222"]
 }
 ```
 
@@ -79,7 +79,7 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 
 ```json
 {
-  "我的跨平台": ["汐月-QQ:FriendMessage:3768914943", "微信bot:FriendMessage:3768914943"]
+  "我的跨平台": ["qq-bot:FriendMessage:10001", "wechat-bot:FriendMessage:10001"]
 }
 ```
 
