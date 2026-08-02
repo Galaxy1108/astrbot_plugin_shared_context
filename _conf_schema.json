@@ -38,6 +38,7 @@
         "type": "text",
         "editor_mode": true,
         "editor_language": "json",
+        "editor_theme": "vs-dark",
         "default": "{}",
         "condition": {
           "enable_custom_groups": true
