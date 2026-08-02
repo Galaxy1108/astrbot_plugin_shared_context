@@ -4,10 +4,15 @@
     "type": "bool",
     "default": false
   },
+  "cross_bot_share": {
+    "description": "允许跨机器人共享（需同时开启上方开关，且仅限 share_groups 中显式分组的会话）。关闭时不同机器人之间永不共享。",
+    "type": "bool",
+    "default": false
+  },
   "share_groups": {
-    "description": "自定义共享组（仅当上方开关开启时生效）：键为组名，值为该组的 unified_msg_origin 数组（值类型请选 json）。留空 {} 表示仍然共享全部。",
+    "description": "自定义共享组（仅当 enable_custom_groups 开启时生效）：键为组名，值为该组的 unified_msg_origin 数组（值类型请选 json）。留空 {} 表示仍然共享全部。",
     "type": "dict",
-    "hint": "示例：键 \"工作群\"，值 [\"aiocqhttp:group:123\", \"telegram:private:456\"]。会话可属于多个组；不属于任何组的会话不记录、不接收共享。可用指令 /shared_umo 查看当前会话的 unified_msg_origin。",
+    "hint": "示例：键 \"工作群\"，值 [\"aiocqhttp:group:123\", \"telegram:private:456\"]。会话可属于多个组；不属于任何组的会话不记录、不接收共享。跨机器人时可用 bot_id::umo 前缀精确指定某个机器人（如 \"2973035822::aiocqhttp:private:123\"），不带前缀则匹配任意机器人的该会话。可用指令 /shared_umo 查看当前会话的 umo 和 bot_id。",
     "default": {}
   },
   "max_messages": {

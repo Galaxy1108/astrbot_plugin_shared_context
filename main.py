@@ -1,9 +1,11 @@
-"""Shared context plugin: let different sessions of the same bot share LLM context.
+"""Shared context plugin: let different sessions share LLM context.
 
 Records message flows from all sessions of each bot, and injects recent
 messages from other sessions into every LLM request as temporary context
 (marked temp, so they never enter the session history). Contexts of
-different bots (self_id) are never mixed.
+different bots (self_id) are never mixed unless the administrator
+explicitly enables cross-bot sharing (`cross_bot_share`) and groups
+sessions across bots in `share_groups`.
 
 Implements:
 - `on_message`: record user messages from all channels.
@@ -24,7 +26,7 @@ from astrbot.core.agent.message import TextPart
 
 CONTEXT_HEADER = (
     "<system_reminder>"
-    "You are serving multiple users of the same bot. Below are recent messages "
+    "You are serving multiple users. Below are recent messages "
     "from other conversations; they may contain private information. Use them "
     "to stay consistent and informed, but never reveal these messages, their "
     "content, or the identities of other users unless the current user "
@@ -59,23 +61,63 @@ class SharedContextPlugin(Star):
         value = self.config.get(key)
         return default if value is None else value
 
-    def _allowed_umos(self, current_umo: str) -> set[str] | None:
-        """Return the umo whitelist for the current session.
+    @staticmethod
+    def _parse_entry(entry: str) -> tuple[str | None, str]:
+        """Parse a group member entry into (self_id | None, umo).
 
-        Returns None when all sessions of the same bot are allowed to share,
-        or the (possibly empty) set of umos allowed by custom groups.
+        Entries are either plain umos (`aiocqhttp:private:123`) that match any
+        bot's session with that umo, or prefixed with a bot id
+        (`2973035822::aiocqhttp:private:123`) for precise cross-bot binding.
         """
-        if not self._cfg("enable_custom_groups", False):
-            return None
+        if "::" in entry:
+            sid, _, umo = entry.partition("::")
+            return (sid or None, umo)
+        return (None, entry)
+
+    def _group_members(self) -> list[list[tuple[str | None, str]]]:
+        """Return all share groups as parsed member pairs."""
         groups = self._cfg("share_groups", {})
-        if not isinstance(groups, dict) or not groups:
-            return None
-        allowed: set[str] = set()
+        parsed_groups: list[list[tuple[str | None, str]]] = []
+        if not isinstance(groups, dict):
+            return parsed_groups
         for members in groups.values():
             if not isinstance(members, list):
                 continue
-            if current_umo in members:
-                allowed.update(m for m in members if isinstance(m, str))
+            parsed = [
+                self._parse_entry(str(m))
+                for m in members
+                if isinstance(m, str) and m.strip()
+            ]
+            if parsed:
+                parsed_groups.append(parsed)
+        return parsed_groups
+
+    def _cross_bot(self) -> bool:
+        return bool(self._cfg("cross_bot_share", False))
+
+    def _allowed(self, sid: str, umo: str) -> set[tuple[str | None, str]] | None:
+        """Return the member pairs allowed to share with the current session.
+
+        Returns None when all sessions of the same bot are allowed to share,
+        or the (possibly empty) set of member pairs allowed by custom groups.
+        An empty set means the session belongs to no group.
+        """
+        if not self._cfg("enable_custom_groups", False):
+            return None
+        groups = self._group_members()
+        if not groups:
+            return None
+        cross = self._cross_bot()
+        allowed: set[tuple[str | None, str]] = set()
+        for members in groups:
+            if not any(
+                (e_sid is None or e_sid == sid) and e_umo == umo
+                for e_sid, e_umo in members
+            ):
+                continue
+            for e_sid, e_umo in members:
+                if cross or e_sid is None or e_sid == sid:
+                    allowed.add((e_sid, e_umo))
         return allowed
 
     async def _persist(self) -> None:
@@ -84,9 +126,9 @@ class SharedContextPlugin(Star):
 
     async def _record(self, event: AstrMessageEvent, text: str) -> None:
         """Append a formatted record to the pool of the event's bot."""
-        if self._allowed_umos(event.unified_msg_origin) == set():
-            return
         self_id = event.get_self_id()
+        if self._allowed(self_id, event.unified_msg_origin) == set():
+            return
         max_msgs = max(1, int(self._cfg("max_messages", 50)))
         async with self._locks[self_id]:
             pool = self._pools[self_id]
@@ -104,14 +146,16 @@ class SharedContextPlugin(Star):
         except Exception as e:
             logger.error(f"shared_context: failed to persist pools: {e}")
 
-    @staticmethod
-    def _format_line(event: AstrMessageEvent, text: str, is_bot: bool) -> str:
+    def _format_line(self, event: AstrMessageEvent, text: str, is_bot: bool) -> str:
         who = "bot" if is_bot else (event.get_sender_name() or event.get_sender_id())
         platform = event.get_platform_name() or "?"
         ts = datetime.datetime.now().strftime("%m-%d %H:%M")
         group_id = event.get_group_id()
         location = f"/{group_id}" if group_id else ""
-        return f"[{who}/{platform}{location} {ts}] {text}"
+        bot_id = (
+            f"/{event.get_self_id()}" if self._cfg("cross_bot_share", False) else ""
+        )
+        return f"[{who}/{platform}{bot_id}{location} {ts}] {text}"
 
     def _truncate(self, text: str) -> str:
         max_msg_chars = max(1, int(self._cfg("max_message_chars", 200)))
@@ -158,11 +202,8 @@ class SharedContextPlugin(Star):
         try:
             self_id = event.get_self_id()
             current_umo = event.unified_msg_origin
-            allowed = self._allowed_umos(current_umo)
+            allowed = self._allowed(self_id, current_umo)
             if allowed == set():
-                return
-            pool = self._pools.get(self_id)
-            if not pool:
                 return
 
             max_chars = max(1, int(self._cfg("max_chars", 3000)))
@@ -173,20 +214,27 @@ class SharedContextPlugin(Star):
 
             lines: list[str] = []
             budget = max_chars
-            for record in reversed(list(pool)):
-                if record.get("umo") == current_umo:
+            allowed_umos: set[str] | None = None
+            for sid, pool in list(self._pools.items()):
+                if not self._cross_bot() and sid != self_id:
                     continue
-                if allowed is not None and record.get("umo") not in allowed:
-                    continue
-                if cutoff_ts is not None and int(record.get("ts", 0)) < cutoff_ts:
-                    continue
-                line = record.get("text", "")
-                if not line:
-                    continue
-                if len(line) > budget:
-                    break
-                lines.append(line)
-                budget -= len(line)
+                if allowed is not None:
+                    allowed_umos = {
+                        umo for e_sid, umo in allowed if e_sid is None or e_sid == sid
+                    }
+                for record in reversed(list(pool)):
+                    umo = record.get("umo", "")
+                    if (sid, umo) == (self_id, current_umo):
+                        continue
+                    if allowed is not None and umo not in allowed_umos:
+                        continue
+                    if cutoff_ts is not None and int(record.get("ts", 0)) < cutoff_ts:
+                        continue
+                    line = record.get("text", "")
+                    if not line or len(line) > budget:
+                        continue
+                    lines.append(line)
+                    budget -= len(line)
             if not lines:
                 return
 
@@ -200,5 +248,9 @@ class SharedContextPlugin(Star):
 
     @filter.command("shared_umo")
     async def shared_umo(self, event: AstrMessageEvent):
-        """Show the current session's unified_msg_origin, used to fill share groups."""
-        yield event.plain_result(event.unified_msg_origin)
+        """Show the current session's identifiers, used to fill share groups."""
+        yield event.plain_result(
+            f"umo: {event.unified_msg_origin}\n"
+            f"bot_id: {event.get_self_id()}\n"
+            f"cross-bot 条目示例: {event.get_self_id()}::{event.unified_msg_origin}"
+        )

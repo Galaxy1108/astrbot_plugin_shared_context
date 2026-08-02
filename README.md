@@ -42,6 +42,7 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 | 配置项 | 默认 | 说明 |
 | --- | --- | --- |
 | `enable_custom_groups` | `false` | 关闭时（默认）同一机器人下的所有会话共享全部上下文 |
+| `cross_bot_share` | `false` | 允许跨机器人共享。需同时开启 `enable_custom_groups` 才生效，且仅限 `share_groups` 中显式分组的会话 |
 | `share_groups` | `{}` | 多共享组：键为组名，值为该组的 `unified_msg_origin` 数组（值类型选 json）。仅开关开启时生效 |
 | `max_messages` | `50` | 共享池保留的最大消息条数 |
 | `max_chars` | `3000` | 每轮 LLM 请求注入的字符数上限 |
@@ -54,7 +55,7 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 
 1. 开启 `enable_custom_groups`
 2. 在 `share_groups` 中添加组：键为组名，值为 `unified_msg_origin` 数组
-3. 向机器人发送 `/shared_umo`，可查看当前会话的 `unified_msg_origin`（格式 `platform:type:session_id`，如 `aiocqhttp:private:123456`、`telegram:group:789`）
+3. 向机器人发送 `/shared_umo`，可查看当前会话的 `unified_msg_origin`（格式 `platform:type:session_id`，如 `aiocqhttp:private:123456`、`telegram:group:789`）和 `bot_id`
 
 ```json
 {
@@ -68,6 +69,24 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 - 会话可属于多个组；所属所有组的成员并集（排除自身）会被注入
 - 不属于任何组的会话：不记录、不接收共享（闭组）
 - 留空 `{}` 或关闭开关 = 仍然共享该机器人的所有会话
+
+### 跨机器人共享（可选）
+
+默认关闭，不同机器人之间的上下文**物理隔离**。需要时：
+
+1. 开启 `enable_custom_groups` 和 `cross_bot_share`
+2. 把不同机器人的会话放进**同一个组**（组条目带 `bot_id::` 前缀可精确指定某个机器人）：
+
+```json
+{
+  "我的跨平台": ["aiocqhttp:private:123", "telegram:private:456"],
+  "双QQ桥接": ["2973035822::aiocqhttp:private:123", "55335533::aiocqhttp:private:123"]
+}
+```
+
+- 不带前缀的条目（如 `aiocqhttp:private:123`）匹配**任意机器人**上 umo 相同的会话
+- 同平台多个机器人时 umo 可能相同，必须用 `bot_id::umo` 前缀精确区分（bot_id 可用 `/shared_umo` 查看）
+- 只有两个开关都开启且会话被显式分组时才会跨机器人共享——不开开关行为与旧版完全一致
 
 ## 与 enhance_mode 等群聊插件共存
 
