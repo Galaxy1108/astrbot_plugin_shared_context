@@ -56,7 +56,30 @@
       "full"
     ],
     "default": "ignore",
-    "hint": "ignore = 忽略（默认，只记录文字）；placeholder = 记录占位标记（如 [图片]、[文件: 名]）；caption = 图片用 AI 描述生成简短占位（需要当前会话的模型支持识图，每次图片消息会调用一次 LLM）；full = 文件读取文本内容转发（文本类文件），其余组件回退占位。"
+    "hint": "ignore = 忽略（默认，只记录文字）；placeholder = 记录占位标记（如 [图片]、[文件: 名]）；caption = 图片用 AI 转述生成简短占位；full = 文件读取文本内容转发（文本类文件），其余组件回退占位。"
+  },
+  "caption_prompt": {
+    "description": "图片转述提示词",
+    "type": "string",
+    "default": "Please describe the image using Chinese."
+  },
+  "caption_use_multimodal": {
+    "description": "多模转述开关",
+    "type": "bool",
+    "default": true,
+    "hint": "仅当 file_component_mode = caption 时生效。开启：使用多模态转述模型看图直述；关闭：使用纯文本转述模型。注意：转述每一张图片都会产生一次额外 LLM 调用，转述所有图片可能很昂贵。"
+  },
+  "caption_multimodal_provider_id": {
+    "description": "多模态转述模型提供商 ID",
+    "type": "string",
+    "default": "",
+    "hint": "多模转述开关开启时使用。留空使用当前会话的提供商；模型需支持识图。"
+  },
+  "caption_text_provider_id": {
+    "description": "纯文本转述模型提供商 ID",
+    "type": "string",
+    "default": "",
+    "hint": "多模转述开关关闭时使用。留空使用当前会话的提供商；模型需能接收图片，否则转述失败会回退为 [图片] 占位。"
   },
   "max_messages": {
     "description": "共享池保留的最大消息条数",

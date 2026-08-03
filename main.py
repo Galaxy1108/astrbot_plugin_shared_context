@@ -327,18 +327,49 @@ class SharedContextPlugin(Star):
         return marker
 
     async def _caption_image(self, url: str, event: AstrMessageEvent) -> str:
-        """Ask the session's provider to describe an image in one short sentence."""
+        """Transcribe an image using the configured caption model.
+
+        References AstrBot core's `_request_img_caption` (astr_main_agent.py)
+        and `group_chat_context.get_image_caption`: the caption provider is
+        called via `text_chat` with `image_urls` and the image caption prompt.
+        The multimodal / plain-text caption model is selected by
+        `caption_use_multimodal`; an empty provider id falls back to the
+        session provider. Note that captioning every image incurs an extra
+        LLM call and may be expensive.
+        """
         try:
-            provider = self.context.get_using_provider(umo=event.unified_msg_origin)
+            use_multimodal = self._cfg("caption_use_multimodal", True)
+            provider_id = self._cfg(
+                "caption_multimodal_provider_id"
+                if use_multimodal
+                else "caption_text_provider_id",
+                "",
+            )
+            provider = None
+            if provider_id:
+                provider = self.context.get_provider_by_id(provider_id)
+                if not provider:
+                    logger.warning(
+                        f"shared_context: caption provider {provider_id} not "
+                        f"found, fallback to session provider"
+                    )
+            if provider is None:
+                provider = self.context.get_using_provider(umo=event.unified_msg_origin)
             if not provider:
                 return ""
+            prompt = self._cfg(
+                "caption_prompt", "Please describe the image using Chinese."
+            )
             resp = await provider.text_chat(
-                prompt="用一句话描述这张图片的内容，20 字以内。",
+                prompt=prompt,
                 image_urls=[url],
                 persist=False,
             )
             text = (resp.completion_text or "").strip()
-            return text[:80] if text else ""
+            max_msg_chars = max(1, int(self._cfg("max_message_chars", 200)))
+            if len(text) > max_msg_chars:
+                return text[:max_msg_chars] + "..."
+            return text
         except Exception as e:
             logger.error(f"shared_context: image caption failed: {e}")
             return ""

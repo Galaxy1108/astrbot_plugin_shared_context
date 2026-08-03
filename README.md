@@ -51,7 +51,11 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 | `max_message_chars` | `200` | 单条消息记录时的截断长度 |
 | `time_window_minutes` | `0` | 只注入最近 N 分钟内的消息，0 表示不限 |
 | `include_bot_replies` | `true` | 是否记录并共享机器人回复 |
-| `file_component_mode` | `ignore` | 消息中的非文本组件（图片/文件/语音等）如何处理：`ignore` = 忽略；`placeholder` = 占位标记（如 `[图片]`）；`caption` = 图片用 AI 描述；`full` = 文件读取文本内容转发 |
+| `file_component_mode` | `ignore` | 消息中的非文本组件（图片/文件/语音等）如何处理：`ignore` = 忽略；`placeholder` = 占位标记（如 `[图片]`）；`caption` = 图片用 AI 转述；`full` = 文件读取文本内容转发 |
+| `caption_prompt` | `Please describe the image using Chinese.` | 图片转述提示词（与 AstrBot 内置一致） |
+| `caption_use_multimodal` | `true` | 多模转述开关：开启用多模态转述模型（看图直述），关闭用纯文本转述模型 |
+| `caption_multimodal_provider_id` | `` | 多模态转述模型提供商 ID，留空用当前会话提供商 |
+| `caption_text_provider_id` | `` | 纯文本转述模型提供商 ID，留空用当前会话提供商 |
 | `skip_command` | `true` | 跳过以 `/` 开头的指令消息 |
 
 ### 自定义共享组
@@ -127,7 +131,8 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 ## 注意
 
 - 共享内容包含用户消息和（可选）机器人回复，机器人回复可能含用户私密信息，请按需关闭 `include_bot_replies`
-- 非文本组件（图片/文件等）默认不记录；`file_component_mode` 可改为占位标记、图片 AI 描述（`caption` 每次图片消息会调用一次 LLM，需要模型支持识图）或文件文本内容转发（`full` 仅限文本类文件，二进制回退占位）
+- 非文本组件（图片/文件等）默认不记录；`file_component_mode` 可改为占位标记、图片 AI 转述（`caption`）或文件文本内容转发（`full` 仅限文本类文件，二进制回退占位）
+- `caption` 模式：通过 `caption_use_multimodal` 开关选择多模态转述模型（`caption_multimodal_provider_id`）或纯文本转述模型（`caption_text_provider_id`），提示词用 `caption_prompt`（默认与 AstrBot 内置一致）；**转述每一张图片都会产生一次额外 LLM 调用，转述所有图片可能很昂贵**；模型不支持识图时转述失败会回退为 `[图片]` 占位
 - 每轮请求都会携带共享块，token 是固定开销，可用 `max_messages` / `max_chars` 控制
 - 需要 AstrBot >= 4.9.2（插件 KV 存储）
 
