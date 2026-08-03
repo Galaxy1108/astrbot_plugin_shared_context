@@ -400,7 +400,7 @@ class SharedContextPlugin(Star):
             path = await comp.get_file()
             if not path or not os.path.exists(path):
                 return ""
-            max_chars = max(1, int(self._cfg("max_message_chars", 200)))
+            max_chars = max(1, int(self._cfg("max_file_chars", 2000)))
             with open(path, encoding="utf-8", errors="replace") as f:
                 content = f.read(max_chars + 1)
             if "\x00" in content:
@@ -422,9 +422,9 @@ class SharedContextPlugin(Star):
                 return
             if self._cfg("skip_command", True) and text.startswith("/"):
                 return
-            await self._record(
-                event, self._format_line(event, self._truncate(text), False)
-            )
+            if self._cfg("file_component_mode", "ignore") != "full":
+                text = self._truncate(text)
+            await self._record(event, self._format_line(event, text, False))
         except Exception as e:
             logger.error(f"shared_context: failed to record message: {e}")
 
@@ -441,9 +441,9 @@ class SharedContextPlugin(Star):
             text = text.strip()
             if not text:
                 return
-            await self._record(
-                event, self._format_line(event, self._truncate(text), True)
-            )
+            if self._cfg("file_component_mode", "ignore") != "full":
+                text = self._truncate(text)
+            await self._record(event, self._format_line(event, text, True))
         except Exception as e:
             logger.error(f"shared_context: failed to record bot reply: {e}")
 

@@ -62,6 +62,14 @@
         "default": "ignore",
         "hint": "ignore = 忽略（默认，只记录文字）；placeholder = 记录占位标记（如 [图片]、[文件: 名]）；caption = 图片用 AI 转述生成简短占位；full = 文件读取文本内容转发，图片同样用 AI 转述。其余组件回退占位。"
       },
+      "max_file_chars": {
+        "description": "文件内容转述的最大字符数（full 模式）",
+        "type": "int",
+        "default": 2000,
+        "condition": {
+          "file_component_mode": "full"
+        }
+      },
       "caption_use_multimodal": {
         "description": "多模转述开关",
         "type": "bool",
