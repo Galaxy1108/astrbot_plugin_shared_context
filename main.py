@@ -16,11 +16,13 @@ Implements:
 import asyncio
 import datetime
 import json
+import os
 import time
 from collections import defaultdict, deque
 from typing import Literal
 
 from astrbot.api import AstrBotConfig, logger
+from astrbot.api import message_components as Comp
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.provider import ProviderRequest
 from astrbot.api.star import Context, Star
@@ -262,11 +264,109 @@ class SharedContextPlugin(Star):
             return text
         return text[:max_msg_chars] + "..."
 
+    async def _chain_text(
+        self, comps: list, event: AstrMessageEvent, is_bot: bool
+    ) -> str:
+        """Build record text from a message chain per file_component_mode.
+
+        Non-text components (images, files, voice, etc.) are handled according
+        to `file_component_mode`: ignored, marked with a placeholder, captioned
+        by the session's provider, or forwarded as file text content.
+        """
+        if not comps:
+            return ""
+        parts: list[str] = []
+        for comp in comps:
+            if isinstance(comp, Comp.Plain) and comp.text:
+                parts.append(comp.text)
+            else:
+                parts.append(await self._non_plain_text(comp, event))
+        return "".join(parts)
+
+    @staticmethod
+    def _component_marker(comp: object) -> str:
+        """Placeholder marker for a non-text component."""
+        if isinstance(comp, Comp.Image):
+            return "[图片]"
+        if isinstance(comp, Comp.File):
+            return f"[文件: {comp.name or '未知'}]"
+        if isinstance(comp, Comp.Record):
+            return "[语音]"
+        if isinstance(comp, Comp.Video):
+            return "[视频]"
+        if isinstance(comp, Comp.At):
+            return f"[At: {comp.name or comp.qq or '?'}]"
+        if isinstance(comp, Comp.Reply):
+            return "[引用]"
+        if isinstance(comp, Comp.Forward):
+            return "[转发]"
+        if isinstance(comp, Comp.Face):
+            return "[表情]"
+        return f"[{type(comp).__name__}]"
+
+    async def _non_plain_text(self, comp: object, event: AstrMessageEvent) -> str:
+        """Text representation of a non-Plain component per file_component_mode."""
+        mode = self._cfg("file_component_mode", "ignore")
+        if mode == "ignore":
+            return ""
+        marker = self._component_marker(comp)
+        if mode == "placeholder":
+            return marker
+        if mode == "caption" and isinstance(comp, Comp.Image):
+            url = comp.url or comp.file
+            if url:
+                cap = await self._caption_image(url, event)
+                if cap:
+                    return f"[图片: {cap}]"
+            return marker
+        if mode == "full" and isinstance(comp, Comp.File):
+            content = await self._read_file_text(comp)
+            if content:
+                return f"[文件: {comp.name or '未知'}\n{content}]"
+            return marker
+        return marker
+
+    async def _caption_image(self, url: str, event: AstrMessageEvent) -> str:
+        """Ask the session's provider to describe an image in one short sentence."""
+        try:
+            provider = self.context.get_using_provider(umo=event.unified_msg_origin)
+            if not provider:
+                return ""
+            resp = await provider.text_chat(
+                prompt="用一句话描述这张图片的内容，20 字以内。",
+                image_urls=[url],
+                persist=False,
+            )
+            text = (resp.completion_text or "").strip()
+            return text[:80] if text else ""
+        except Exception as e:
+            logger.error(f"shared_context: image caption failed: {e}")
+            return ""
+
+    async def _read_file_text(self, comp: Comp.File) -> str:
+        """Read a text file's content for the `full` mode."""
+        try:
+            path = await comp.get_file()
+            if not path or not os.path.exists(path):
+                return ""
+            max_chars = max(1, int(self._cfg("max_message_chars", 200)))
+            with open(path, encoding="utf-8", errors="replace") as f:
+                content = f.read(max_chars + 1)
+            if "\x00" in content:
+                return ""  # binary file
+            if len(content) > max_chars:
+                return content[:max_chars] + "..."
+            return content
+        except Exception as e:
+            logger.debug(f"shared_context: failed to read file: {e}")
+            return ""
+
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def on_message(self, event: AstrMessageEvent) -> None:
         """Record user messages from all channels."""
         try:
-            text = event.get_message_str().strip()
+            text = await self._chain_text(event.get_messages(), event, False)
+            text = text.strip()
             if not text:
                 return
             if self._cfg("skip_command", True) and text.startswith("/"):
@@ -284,7 +384,10 @@ class SharedContextPlugin(Star):
             if not self._cfg("include_bot_replies", True):
                 return
             result = event.get_result()
-            text = result.get_plain_text().strip() if result else ""
+            if not result or not result.chain:
+                return
+            text = await self._chain_text(result.chain, event, True)
+            text = text.strip()
             if not text:
                 return
             await self._record(

@@ -46,6 +46,18 @@
       }
     }
   },
+  "file_component_mode": {
+    "description": "消息中的非文本组件（图片/文件/语音/视频等）如何处理",
+    "type": "string",
+    "options": [
+      "ignore",
+      "placeholder",
+      "caption",
+      "full"
+    ],
+    "default": "ignore",
+    "hint": "ignore = 忽略（默认，只记录文字）；placeholder = 记录占位标记（如 [图片]、[文件: 名]）；caption = 图片用 AI 描述生成简短占位（需要当前会话的模型支持识图，每次图片消息会调用一次 LLM）；full = 文件读取文本内容转发（文本类文件），其余组件回退占位。"
+  },
   "max_messages": {
     "description": "共享池保留的最大消息条数",
     "type": "int",
