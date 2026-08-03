@@ -56,7 +56,7 @@
       "full"
     ],
     "default": "ignore",
-    "hint": "ignore = 忽略（默认，只记录文字）；placeholder = 记录占位标记（如 [图片]、[文件: 名]）；caption = 图片用 AI 转述生成简短占位；full = 文件读取文本内容转发（文本类文件），其余组件回退占位。"
+    "hint": "ignore = 忽略（默认，只记录文字）；placeholder = 记录占位标记（如 [图片]、[文件: 名]）；caption = 图片用 AI 转述生成简短占位；full = 文件读取文本内容转发，图片同样用 AI 转述。其余组件回退占位。转述设置见下方 caption 相关配置。"
   },
   "caption_prompt": {
     "description": "图片转述提示词",

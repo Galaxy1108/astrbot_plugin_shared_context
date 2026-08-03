@@ -305,14 +305,19 @@ class SharedContextPlugin(Star):
         return f"[{type(comp).__name__}]"
 
     async def _non_plain_text(self, comp: object, event: AstrMessageEvent) -> str:
-        """Text representation of a non-Plain component per file_component_mode."""
+        """Text representation of a non-Plain component per file_component_mode.
+
+        `caption` and `full` both transcribe images via the caption model
+        (`caption_use_multimodal` selects the multimodal/text model); `full`
+        additionally reads text file content.
+        """
         mode = self._cfg("file_component_mode", "ignore")
         if mode == "ignore":
             return ""
         marker = self._component_marker(comp)
         if mode == "placeholder":
             return marker
-        if mode == "caption" and isinstance(comp, Comp.Image):
+        if mode in ("caption", "full") and isinstance(comp, Comp.Image):
             url = comp.url or comp.file
             if url:
                 cap = await self._caption_image(url, event)
