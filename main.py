@@ -24,7 +24,7 @@ from typing import Literal
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api import message_components as Comp
 from astrbot.api.event import AstrMessageEvent, filter
-from astrbot.api.provider import ProviderRequest
+from astrbot.api.provider import Provider, ProviderRequest
 from astrbot.api.star import Context, Star
 from astrbot.core.agent.message import TextPart
 
@@ -70,11 +70,15 @@ class SharedContextPlugin(Star):
         )
 
     def _cfg(self, key: str, default):
+        """Look up a config value: flat top-level keys first, then any
+        top-level object group (e.g. custom_groups, file_caption)."""
         value = self.config.get(key)
-        group = self.config.get("custom_groups")
-        if isinstance(group, dict) and key in group:
-            value = group[key]
-        return default if value is None else value
+        if value is not None:
+            return value
+        for group in self.config.values():
+            if isinstance(group, dict) and key in group and group[key] is not None:
+                return group[key]
+        return default
 
     def _group_members(self) -> list[list[str]]:
         """Parse share_groups into member lists.
@@ -335,36 +339,32 @@ class SharedContextPlugin(Star):
         """Transcribe an image using the configured caption model.
 
         References AstrBot core's `_request_img_caption` (astr_main_agent.py)
-        and `group_chat_context.get_image_caption`: the caption provider is
-        called via `text_chat` with `image_urls` and the image caption prompt.
-        The multimodal / plain-text caption model is selected by
-        `caption_use_multimodal`; an empty provider id falls back to the
-        session provider. Note that captioning every image incurs an extra
-        LLM call and may be expensive.
+        and `group_chat_context.get_image_caption`. The plain-text caption
+        model (`caption_text_provider_id`) is always the transcription
+        executor; when `caption_use_multimodal` is enabled, the multimodal
+        caption model (`caption_multimodal_provider_id`) handles image content
+        first, falling back to the text model. Empty provider ids fall back
+        to the session provider. Note that captioning every image incurs an
+        extra LLM call and may be expensive.
         """
         try:
             use_multimodal = self._cfg("caption_use_multimodal", True)
-            provider_id = self._cfg(
-                "caption_multimodal_provider_id"
-                if use_multimodal
-                else "caption_text_provider_id",
-                "",
+            text_provider = self._resolve_provider(
+                self._cfg("caption_text_provider_id", ""), event
             )
-            provider = None
-            if provider_id:
-                provider = self.context.get_provider_by_id(provider_id)
-                if not provider:
-                    logger.warning(
-                        f"shared_context: caption provider {provider_id} not "
-                        f"found, fallback to session provider"
-                    )
-            if provider is None:
-                provider = self.context.get_using_provider(umo=event.unified_msg_origin)
-            if not provider:
-                return ""
+            provider = text_provider
             prompt = self._cfg(
                 "caption_prompt", "Please describe the image using Chinese."
             )
+            if use_multimodal:
+                provider = (
+                    self._resolve_provider(
+                        self._cfg("caption_multimodal_provider_id", ""), event
+                    )
+                    or text_provider
+                )
+            if not provider:
+                return ""
             resp = await provider.text_chat(
                 prompt=prompt,
                 image_urls=[url],
@@ -378,6 +378,21 @@ class SharedContextPlugin(Star):
         except Exception as e:
             logger.error(f"shared_context: image caption failed: {e}")
             return ""
+
+    def _resolve_provider(
+        self, provider_id: str, event: AstrMessageEvent
+    ) -> Provider | None:
+        """Resolve a caption provider by id, falling back to the session
+        provider (with a warning when the configured id is missing)."""
+        if provider_id:
+            provider = self.context.get_provider_by_id(provider_id)
+            if provider:
+                return provider
+            logger.warning(
+                f"shared_context: caption provider {provider_id} not found, "
+                f"fallback to session provider"
+            )
+        return self.context.get_using_provider(umo=event.unified_msg_origin)
 
     async def _read_file_text(self, comp: Comp.File) -> str:
         """Read a text file's content for the `full` mode."""
