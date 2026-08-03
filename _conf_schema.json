@@ -73,12 +73,14 @@
     "description": "多模态转述模型提供商 ID",
     "type": "string",
     "default": "",
+    "_special": "select_provider",
     "hint": "多模转述开关开启时使用。留空使用当前会话的提供商；模型需支持识图。"
   },
   "caption_text_provider_id": {
     "description": "纯文本转述模型提供商 ID",
     "type": "string",
     "default": "",
+    "_special": "select_provider",
     "hint": "多模转述开关关闭时使用。留空使用当前会话的提供商；模型需能接收图片，否则转述失败会回退为 [图片] 占位。"
   },
   "max_messages": {
