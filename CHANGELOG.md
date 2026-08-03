@@ -1,5 +1,13 @@
 # 更新日志
 
+## 0.2.1
+
+- 新增 `file_component_mode`：消息中非文本组件（图片/文件/语音等）的处理方式（ignore / placeholder / caption / full）
+- `caption` 与 `full` 模式支持图片 AI 转述：`caption_prompt`（与 AstrBot 内置一致）、`caption_use_multimodal` 多模转述开关、`caption_text_provider_id`（纯文本转述模型，始终启用）、`caption_multimodal_provider_id`（多模态转述模型，仅转述图片内容）；提供商选择使用 WebUI 选择器
+- `full` 模式：文件读取文本内容转发（`max_file_chars` 独立上限，默认 2000），图片同样转述，整行不再受单条消息截断限制
+- 所有文件转述设置归入「文件与图片转述」设置组
+- 更新描述：跨机器人共享为可选项而非禁止
+
 ## 0.2.0
 
 - 新增**跨机器人共享**（`cross_bot_share`，默认关闭，开启后仅显式分组的会话互通）
