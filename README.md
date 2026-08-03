@@ -3,7 +3,7 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 ![AstrBot](https://img.shields.io/badge/AstrBot-%3E%3D4.9.2-blue)
 ![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue)
-![Version](https://img.shields.io/badge/version-0.2.1-blue.svg)
+![Version](https://img.shields.io/github/v/tag/Galaxy1108/astrbot_plugin_shared_context)
 ![GitHub stars](https://img.shields.io/github/stars/Galaxy1108/astrbot_plugin_shared_context)
 
 > [!IMPORTANT]
