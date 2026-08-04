@@ -10,6 +10,12 @@
 - 本仓库当前还不是 git 仓库，提交前先 `git init`。
 - 访问 GitHub 需要代理时用 `http://127.0.0.1:7897`（如 `gh`/`git` 配置 `https_proxy`）。
 
+## 发布流程（重要）
+
+- 日常开发/测试只在**测试仓库** `Galaxy1108/astrbot_plugin_shared_context_unstable`（remote 名 `unstable`，版本号带 `-unstable` 后缀）进行，改动推它的 `main` 分支。
+- **主仓库**（`origin`）的 `main` 分支只在**发布时**更新：正式版本号 + CHANGELOG 后 merge/推送。
+- 主仓库日常保持干净，不要在 main 上提交开发改动。
+
 ## 插件结构（缺一不可）
 
 - `metadata.yaml`：必填 `name`/`desc`/`author`/`version`；可选 `display_name`、`short_desc`、`support_platforms`、`astrbot_version`。AstrBot 没有它不会加载插件。
