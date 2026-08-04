@@ -103,6 +103,51 @@
       }
     }
   },
+  "cache_optimization": {
+    "description": "缓存优化（激进模式）：牺牲少量跨轮上下文连续性，换取服务端提示词缓存命中率。默认关闭，关闭时行为与旧版本完全一致",
+    "type": "object",
+    "items": {
+      "enable_cache_optimization": {
+        "description": "启用缓存优化",
+        "hint": "开启后：每轮注入量改为\"上次请求后新增的消息 + 最近几条保底\"（增量注入），且注入块大小受缓存友好上限约束（见 cache_ratio），大幅降低每轮的缓存 miss 量。代价：较早的其他会话消息不会每轮重复注入，跨轮连续性略有下降。",
+        "type": "bool",
+        "default": false
+      },
+      "incremental_injection": {
+        "description": "增量注入",
+        "hint": "开启：会话第一次请求注入全量，之后只注入新增记录与最近 keep_recent 条保底；关闭：每轮注入整个共享池（受 max_chars 限制，旧行为）。",
+        "type": "bool",
+        "default": true,
+        "condition": {
+          "enable_cache_optimization": true
+        }
+      },
+      "keep_recent": {
+        "description": "跨轮保底保留的最近记录条数",
+        "hint": "增量注入时，除新增消息外始终保留的最近 N 条记录，保证模型对\"刚才提到的内容\"仍有连续性。越大越接近旧行为，越小缓存越友好。",
+        "type": "int",
+        "default": 3,
+        "condition": {
+          "enable_cache_optimization": true
+        }
+      },
+      "cache_ratio": {
+        "description": "注入块与可缓存上下文的体积比",
+        "hint": "注入块大小 = min(max_chars, 会话历史+当前消息字符数 × cache_ratio)，保证块不会喧宾夺主，命中率有下限。1.5 表示块最多为历史的 1.5 倍（命中率约 60% 起步），调小更省但上下文变少。",
+        "type": "float",
+        "default": 1.5,
+        "condition": {
+          "enable_cache_optimization": true
+        }
+      }
+    }
+  },
+  "include_timestamps": {
+    "description": "注入的记录行是否带时间戳",
+    "hint": "时间戳占 token 且让模型过分关注时间，关掉可进一步压缩每轮注入量（对缓存命中率影响很小，可独立开关）。",
+    "type": "bool",
+    "default": true
+  },
   "max_messages": {
     "description": "共享池保留的最大消息条数",
     "type": "int",

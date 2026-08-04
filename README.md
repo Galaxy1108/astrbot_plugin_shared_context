@@ -58,6 +58,12 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 | `time_window_minutes` | `0` | 只注入最近 N 分钟内的消息，0 表示不限 |
 | `include_bot_replies` | `true` | 是否记录并共享机器人回复 |
 | `skip_command` | `true` | 跳过以 `/` 开头的指令消息 |
+| `include_timestamps` | `true` | 注入的记录行是否带时间戳（关闭可压缩每轮注入量） |
+| **缓存优化**（分组，激进模式，默认关闭） | | |
+| `enable_cache_optimization` | `false` | 启用缓存优化，牺牲少量跨轮上下文连续性换取服务端提示词缓存命中率（详见下文「缓存优化」） |
+| `incremental_injection` | `true` | 增量注入：会话第一次请求注入全量，之后只注入新增记录 + 最近 `keep_recent` 条保底 |
+| `keep_recent` | `3` | 跨轮保底保留的最近记录条数，越大越接近旧行为、越小缓存越友好 |
+| `cache_ratio` | `1.5` | 注入块与可缓存上下文（会话历史 + 当前消息）的体积比上限，保证缓存命中率有下限 |
 | **文件与图片转述**（分组） | | |
 | `file_component_mode` | `ignore` | 消息中的非文本组件（图片/文件/语音等）如何处理：`ignore` = 忽略；`placeholder` = 占位标记（如 `[图片]`）；`caption` = 图片用 AI 转述；`full` = 文件读取文本内容转发、图片同样转述 |
 | `caption_use_multimodal` | `true` | 多模转述开关：开启时图片由多模态转述模型看图直述 |
@@ -142,6 +148,18 @@ git clone https://github.com/Galaxy1108/astrbot_plugin_shared_context
 - `caption` 和 `full` 的图片转述：**纯文本转述模型**（`caption_text_provider_id`）始终作为转述执行者；开启多模转述（`caption_use_multimodal`）时，图片由**多模态转述模型**（`caption_multimodal_provider_id`）看图直述，失败/未配置时回退到纯文本转述模型；提示词用 `caption_prompt`（默认与 AstrBot 内置一致）；**转述每一张图片都会产生一次额外 LLM 调用，转述所有图片可能很昂贵**；模型不支持识图时转述失败会回退为 `[图片]` 占位
 - 每轮请求都会携带共享块，token 是固定开销，可用 `max_messages` / `max_chars` 控制
 - 需要 AstrBot >= 4.9.2（插件 KV 存储）
+
+## 缓存优化
+
+DeepSeek / OpenAI 等提供商的**前缀缓存**只命中请求前缀（系统提示 + 会话历史 + 当前消息）；本插件的共享块位于请求尾部且每轮内容都在变，因此这些 token **每轮都无法命中缓存**，会直接把整体命中率拉低（块越大降得越多）。
+
+`enable_cache_optimization`（默认关闭，行为与旧版本一致）开启后从三方面把每轮 miss 量压到最小：
+
+1. **增量注入**（`incremental_injection`，默认开）：会话的第一次请求注入全量；之后只注入"上次请求之后其他会话新增的记录 + 最近 `keep_recent` 条保底"。其他会话安静时，块从上千字符缩到几百字符。
+2. **自适应上限**（`cache_ratio`，默认 `1.5`）：块大小 = `min(max_chars, 可缓存上下文字符数 × cache_ratio)`，历史短则块自动缩小，命中率始终有下限（约 60% 起步）。
+3. **格式压缩**（`include_timestamps` 可单独关闭）：记录行不带时间戳，进一步省 token。
+
+代价：较早的其他会话消息不会每轮重复注入（首次请求和新增时都会完整出现），跨多轮的"遥记"能力略有下降；`keep_recent` 调大即可更接近旧行为。
 
 ## 常见问题
 

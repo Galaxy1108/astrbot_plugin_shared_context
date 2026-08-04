@@ -1,5 +1,13 @@
 # 更新日志
 
+## 未发布
+
+- 新增**缓存优化**（激进模式，默认关闭，`enable_cache_optimization`）：修复开启共享后服务端前缀缓存命中率大幅下降的问题
+  - `incremental_injection`：增量注入，会话首次请求注入全量，之后只注入新增记录 + 最近 `keep_recent` 条保底
+  - `cache_ratio`：注入块大小受可缓存上下文体积比约束，保证命中率下限
+  - `include_timestamps`：可单独关闭记录行时间戳，进一步压缩注入量
+- 消息记录增加自增序号（`seq`），增量注入依赖其判定新增；老数据无 `seq` 时按全量注入处理，无需迁移
+
 ## 0.2.1
 
 - 新增 `file_component_mode`：消息中非文本组件（图片/文件/语音等）的处理方式（ignore / placeholder / caption / full）

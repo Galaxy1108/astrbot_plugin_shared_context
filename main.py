@@ -46,9 +46,16 @@ class SharedContextPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig) -> None:
         super().__init__(context)
         self.config = config
-        # self_id -> deque of {"umo": str, "text": str, "ts": int}
+        # self_id -> deque of {"umo": str, "text": str, "ts": int, "seq": int}
         self._pools: dict[str, deque[dict]] = defaultdict(deque)
         self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        # self_id -> monotonically increasing sequence counter
+        self._seq: dict[str, int] = defaultdict(int)
+        # (self_id, umo) -> {pool_self_id: last injected seq}, for incremental
+        # injection: only records newer than this (plus a small recent window)
+        # are injected on the next request, so the volatile block stays small
+        # and server-side prefix cache hit rates are preserved.
+        self._last_seen: dict[tuple[str, str], dict[str, int]] = {}
 
     async def initialize(self) -> None:
         """Load persisted pools so the shared context survives reloads."""
@@ -58,6 +65,14 @@ class SharedContextPlugin(Star):
                 for self_id, records in data.items():
                     if isinstance(records, list):
                         self._pools[self_id].extend(records)
+                        self._seq[self_id] = max(
+                            (
+                                int(r.get("seq", 0))
+                                for r in records
+                                if isinstance(r, dict)
+                            ),
+                            default=self._seq[self_id],
+                        )
         except Exception as e:
             logger.error(f"shared_context: failed to load pools: {e}")
         groups = self._group_members()
@@ -240,9 +255,17 @@ class SharedContextPlugin(Star):
             return
         self_id = event.get_self_id()
         max_msgs = max(1, int(self._cfg("max_messages", 50)))
+        self._seq[self_id] += 1
         async with self._locks[self_id]:
             pool = self._pools[self_id]
-            pool.append({"umo": umo, "text": text, "ts": int(time.time())})
+            pool.append(
+                {
+                    "umo": umo,
+                    "text": text,
+                    "ts": int(time.time()),
+                    "seq": self._seq[self_id],
+                }
+            )
             while len(pool) > max_msgs:
                 pool.popleft()
         logger.debug(f"shared_context: recorded | {self_id} | {umo} | {text}")
@@ -254,13 +277,20 @@ class SharedContextPlugin(Star):
     def _format_line(self, event: AstrMessageEvent, text: str, is_bot: bool) -> str:
         who = "bot" if is_bot else (event.get_sender_name() or event.get_sender_id())
         platform = event.get_platform_name() or "?"
-        ts = datetime.datetime.now().strftime("%m-%d %H:%M")
+        ts = (
+            datetime.datetime.now().strftime("%m-%d %H:%M")
+            if self._cfg("include_timestamps", False)
+            else ""
+        )
         group_id = event.get_group_id()
         location = f"/{group_id}" if group_id else ""
         bot_id = (
             f"/{event.get_self_id()}" if self._cfg("cross_bot_share", False) else ""
         )
-        return f"[{who}/{platform}{bot_id}{location} {ts}] {text}"
+        prefix = f"[{who}/{platform}{bot_id}{location}"
+        if ts:
+            prefix += f" {ts}"
+        return f"{prefix}] {text}"
 
     def _truncate(self, text: str) -> str:
         max_msg_chars = max(1, int(self._cfg("max_message_chars", 200)))
@@ -451,7 +481,21 @@ class SharedContextPlugin(Star):
     async def on_llm_request(
         self, event: AstrMessageEvent, req: ProviderRequest
     ) -> None:
-        """Inject recent messages from other sessions into the LLM request."""
+        """Inject recent messages from other sessions into the LLM request.
+
+        The injected block always sits at the tail of the last user message,
+        so it can never hit server-side prefix caches (it changes every turn).
+        With `enable_cache_optimization` off (default), the whole pool is
+        injected every turn, capped only by `max_chars`. When the optimization
+        switch is on, the block is kept as small as possible to preserve cache
+        hit rates:
+        - `incremental_injection`: after the first request of a session, only
+          records newer than the last request (plus a small recent window) are
+          injected, instead of the whole pool every turn.
+        - `cache_ratio`: the block is additionally capped by the size of the
+          cacheable context (session history + current prompt), so the block
+          never dominates the request.
+        """
         try:
             self_id = event.get_self_id()
             current_umo = event.unified_msg_origin
@@ -468,19 +512,33 @@ class SharedContextPlugin(Star):
                 f"cross_bot={self._cross_bot()}"
             )
 
+            optimized = bool(self._cfg("enable_cache_optimization", False))
             max_chars = max(1, int(self._cfg("max_chars", 3000)))
+            if optimized:
+                budget = min(max_chars, self._adaptive_budget(req))
+            else:
+                budget = max_chars
             window_minutes = int(self._cfg("time_window_minutes", 0))
             cutoff_ts = (
                 int(time.time()) - window_minutes * 60 if window_minutes > 0 else None
             )
 
-            lines: list[str] = []
-            budget = max_chars
+            incremental = optimized and bool(self._cfg("incremental_injection", True))
+            keep_recent = max(0, int(self._cfg("keep_recent", 3)))
+            key = (self_id, current_umo)
+            last_seen = self._last_seen.get(key)
+
+            items: list[tuple[str, int, int, str]] = []  # (sid, ts, seq, line)
+            pool_max: dict[str, int] = {}
             for sid, pool in list(self._pools.items()):
                 if not global_share and not self._cross_bot() and sid != self_id:
                     continue
-                before = len(lines)
-                for record in reversed(list(pool)):
+                if not pool:
+                    continue
+                seen_sid = last_seen.get(sid, 0) if last_seen else 0
+                max_seq = max((int(r.get("seq", 0)) for r in pool), default=0)
+                pool_max[sid] = max_seq
+                for record in pool:
                     umo = record.get("umo", "")
                     if (sid, umo) == (self_id, current_umo):
                         continue
@@ -488,35 +546,77 @@ class SharedContextPlugin(Star):
                         continue
                     if allowed is not None:
                         platform = umo.split(":", 1)[0]
-                        matched = ("umo", umo) in allowed or (
+                        if ("umo", umo) not in allowed and (
                             "platform",
                             platform,
-                        ) in allowed
-                        if not matched:
+                        ) not in allowed:
                             continue
+                    seq = int(record.get("seq", 0))
                     if cutoff_ts is not None and int(record.get("ts", 0)) < cutoff_ts:
                         continue
                     line = record.get("text", "")
                     if not line or len(line) > budget:
                         continue
-                    lines.append(line)
-                    budget -= len(line)
-                if len(lines) > before:
-                    logger.debug(
-                        f"shared_context: pool hit | bot={sid} | "
-                        f"contributed={len(lines) - before} lines"
-                    )
-            if not lines:
+                    if incremental and last_seen is not None:
+                        is_new = seq > seen_sid
+                        is_recent = max_seq - keep_recent < seq
+                        if not is_new and not is_recent:
+                            continue
+                    items.append((sid, int(record.get("ts", 0)), seq, line))
+            if not items:
                 logger.debug(
                     f"shared_context: pools empty or no match, skip injection | "
                     f"{current_umo}"
                 )
                 return
 
+            items.sort(key=lambda it: (it[1], it[2]), reverse=True)
+            lines: list[str] = []
+            used = 0
+            injected_seq: dict[str, int] = {}
+            for sid, _ts, seq, line in items:
+                if len(line) > budget - used:
+                    continue
+                lines.append(line)
+                used += len(line)
+                if seq > injected_seq.get(sid, 0):
+                    injected_seq[sid] = seq
+            if not lines:
+                logger.debug(
+                    f"shared_context: nothing fits the budget, skip injection | "
+                    f"{current_umo}"
+                )
+                return
+            if incremental:
+                self._last_seen[key] = injected_seq
+                if len(lines) < len(items):
+                    logger.debug(
+                        f"shared_context: budget cut | {len(items) - len(lines)} "
+                        f"lines pending for next request"
+                    )
+
             block = CONTEXT_HEADER + "\n".join(reversed(lines)) + CONTEXT_FOOTER
             req.extra_user_content_parts.append(TextPart(text=block).mark_as_temp())
             logger.debug(
-                f"shared_context: injected {len(lines)} lines for session {current_umo}"
+                f"shared_context: injected {len(lines)} lines ({used}/{budget} chars) "
+                f"for session {current_umo}"
             )
         except Exception as e:
             logger.error(f"shared_context: failed to inject context: {e}")
+
+    def _adaptive_budget(self, req: ProviderRequest) -> int:
+        """Cap the injected block by the size of the cacheable context.
+
+        Server-side prefix caches only cover the request prefix (system prompt,
+        session history and the current user message); the injected block is
+        always a miss. Capping the block at `cache_ratio` x the cacheable
+        context keeps the hit rate at or above a predictable floor.
+        """
+        total = 0
+        contexts = req.contexts if isinstance(req.contexts, list) else []
+        for msg in contexts:
+            content = msg.get("content", "") if isinstance(msg, dict) else ""
+            total += len(content) if isinstance(content, str) else len(str(content))
+        total += len(req.prompt or "")
+        ratio = max(0.1, float(self._cfg("cache_ratio", 1.5)))
+        return max(300, int(total * ratio))
