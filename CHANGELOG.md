@@ -1,6 +1,6 @@
 # 更新日志
 
-## 未发布
+## 0.2.2
 
 - 新增**缓存优化**（激进模式，默认关闭，`enable_cache_optimization`）：修复开启共享后服务端前缀缓存命中率大幅下降的问题
   - `incremental_injection`：增量注入，会话首次请求注入全量，之后只注入新增记录 + 最近 `keep_recent` 条保底
